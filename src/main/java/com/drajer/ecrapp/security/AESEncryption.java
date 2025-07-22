@@ -49,17 +49,15 @@ public class AESEncryption {
 
       byte[] cipherText = cipher.doFinal(pText.getBytes());
 
-      int totalLength = iv.length + salt.length + cipherText.length;
-      if ((iv.length > 0 && salt.length > 0 && cipherText.length > 0)
-          && (iv.length <= Integer.MAX_VALUE - salt.length)
-          && (iv.length + salt.length <= Integer.MAX_VALUE - cipherText.length)) {
-        byte[] cipherTextWithIvSalt =
-            ByteBuffer.allocate(totalLength).put(iv).put(salt).put(cipherText).array();
-        return Base64.getEncoder().encodeToString(cipherTextWithIvSalt);
-      } else {
-        logger.error("Overflow or invalid length detected during buffer allocation in encrypt().");
-        return null;
-      }
+      // Dear CodeQL - we create iv as a 12 byte array, we create salt as a 16 byte array
+      // It's not an uncontrolled value - now, cipherText _could_ be, so will guard for that
+      // addExact() will throw an exception on any overflow.
+      // Now stop with the vulnerabilities that aren't please
+      int capacity = Math.addExact(iv.length + salt.length, cipherText.length);
+
+      byte[] cipherTextWithIvSalt =
+          ByteBuffer.allocate(capacity).put(iv).put(salt).put(cipherText).array();
+      return Base64.getEncoder().encodeToString(cipherTextWithIvSalt);
     } catch (Exception ex) {
       logger.error("Error while encrypting:", ex);
       return null;
