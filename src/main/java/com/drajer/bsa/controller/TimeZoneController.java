@@ -27,7 +27,7 @@ public class TimeZoneController {
   public ResponseEntity<String> setTimeZone(@RequestParam String timeZone) {
     try {
       timeZoneService.setDatabaseTimezone(timeZone);
-      return ResponseEntity.ok("Time zone updated successfully to " + timeZone);
+      return ResponseEntity.ok("Time zone updated successfully.");
     } catch (Exception e) {
       logger.error("Error updating time zone", e);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
