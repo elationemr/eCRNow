@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.12</version>
+        <version>3.5.3</version>
         <relativePath/>
         <!-- lookup parent from repository -->
     </parent>
@@ -19,9 +19,8 @@
 
     <properties>
         <java.version>17</java.version>
-        <fhir.version>5.4.0</fhir.version>
-        <fhirpath.version>5.4.0</fhirpath.version>
-        <cql-evaluator.version>1.4.5</cql-evaluator.version>
+        <fhir.version>8.2.1</fhir.version>
+        <cql-evaluator.version>2.6.0</cql-evaluator.version>
         <skip.integration.tests>false</skip.integration.tests>
     </properties>
 
@@ -107,7 +106,7 @@
         <dependency>
             <groupId>com.github.kagkarlsson</groupId>
             <artifactId>db-scheduler-spring-boot-starter</artifactId>
-            <version>11.6</version>
+            <version>16.0.0</version>
         </dependency>
 
         <!-- https://mvnrepository.com/artifact/javax.interceptor/javax.interceptor-api -->
@@ -128,7 +127,7 @@
         <dependency>
             <groupId>com.jayway.jsonpath</groupId>
             <artifactId>json-path</artifactId>
-            <version>2.5.0</version>
+            <version>2.9.0</version>
         </dependency>
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -236,32 +235,32 @@
         <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
-            <version>20190722</version>
+            <version>20250517</version>
         </dependency>
 
         <!-- Java stuff -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.13.2</version>
+            <version>2.19.2</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
-            <version>2.13.3</version>
+            <version>2.19.2</version>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.12.6.1</version>
+            <version>2.19.2</version>
         </dependency>
 
 
         <dependency>
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
-            <version>2.8.5</version>
+            <version>2.8.9</version>
         </dependency>
 
         <dependency>

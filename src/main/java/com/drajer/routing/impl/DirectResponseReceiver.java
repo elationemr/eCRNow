@@ -41,7 +41,7 @@ public class DirectResponseReceiver extends RRReceiver {
     if (context instanceof LaunchDetails details) {
 
       logger.info(" Obtained Launch Details ");
-        readMail(details);
+      readMail(details);
     }
 
     return context;
@@ -56,7 +56,6 @@ public class DirectResponseReceiver extends RRReceiver {
 
       Session session = Session.getInstance(createConnectionProperties(), null);
       Store store = connectToStore(session.getStore(IMAP), details);
-
 
       Folder inbox = store.getFolder(INBOX);
       inbox.open(Folder.READ_WRITE);
@@ -84,7 +83,7 @@ public class DirectResponseReceiver extends RRReceiver {
         logger.info("Sender Address :{}", senderAddress);
 
         if (message.getContent() instanceof Multipart multipart) {
-            for (int i = 0; i < multipart.getCount(); i++) {
+          for (int i = 0; i < multipart.getCount(); i++) {
             BodyPart bodyPart = multipart.getBodyPart(i);
 
             if (bodyPart.getFileName() != null
