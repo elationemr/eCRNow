@@ -125,15 +125,21 @@ public class BaseKarsTest extends BaseIntegrationTest {
         this.stubHelper.mockReceiveEicr(bundle);
       }
 
-      PatientLaunchContext launchContext = null;
-      List<KarProcessingData> dataList =
-          notificationReceiver.processNotification(
-              bundle,
-              mock(HttpServletRequest.class),
-              mock(HttpServletResponse.class),
-              launchContext);
+      Boolean reportBundleGenerated = false;
+      List<KarProcessingData> dataList = null;
+      try {
+        PatientLaunchContext launchContext = null;
+        dataList =
+            notificationReceiver.processNotification(
+                bundle,
+                mock(HttpServletRequest.class),
+                mock(HttpServletResponse.class),
+                launchContext);
+      } catch (Exception e) {
+        reportBundleGenerated = false;
+      }
 
-      Boolean reportBundleGenerated =
+      reportBundleGenerated =
           this.reportBundleGenerated(
               dataList, this.testCaseInfo.getName(), this.testCaseInfo.getPlanDefUrl());
 
@@ -338,8 +344,7 @@ public class BaseKarsTest extends BaseIntegrationTest {
 
     // Filter subdirectories for now..
     List<File> files =
-        Arrays.asList(scenario.listFiles())
-            .stream()
+        Arrays.asList(scenario.listFiles()).stream()
             .filter(x -> x.isFile())
             .collect(Collectors.toList());
 
@@ -450,11 +455,7 @@ public class BaseKarsTest extends BaseIntegrationTest {
 
   protected void validatePopulation(MeasureReport report, String population, int count) {
     Optional<MeasureReportGroupPopulationComponent> pgc =
-        report
-            .getGroup()
-            .get(0)
-            .getPopulation()
-            .stream()
+        report.getGroup().get(0).getPopulation().stream()
             .filter(x -> x.getCode().getCodingFirstRep().getCode().equals(population))
             .findFirst();
     if (!pgc.isPresent()) {

@@ -11,20 +11,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.UUID;
-import javax.mail.Address;
-import javax.mail.BodyPart;
-import javax.mail.Flags;
-import javax.mail.Folder;
-import javax.mail.Header;
-import javax.mail.Message;
-import javax.mail.Multipart;
-import javax.mail.Session;
-import javax.mail.Store;
+import javax.mail.*;
 import javax.mail.internet.InternetAddress;
 import javax.mail.search.FlagTerm;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.text.StringEscapeUtils;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,10 +38,9 @@ public class DirectResponseReceiver extends RRReceiver {
 
     logger.info(" **** START Executing Direct Receive **** ");
 
-    if (context instanceof LaunchDetails) {
+    if (context instanceof LaunchDetails details) {
 
       logger.info(" Obtained Launch Details ");
-      LaunchDetails details = (LaunchDetails) context;
       readMail(details);
     }
 
@@ -61,32 +53,9 @@ public class DirectResponseReceiver extends RRReceiver {
 
       String mId = "";
       logger.info("Reading mail..");
-      // Properties for Javamail
-      Properties props = new Properties();
-      props.put("mail.imap.auth", "true");
-      props.put("mail.imap.ssl.enable", "true");
-      props.put("mail.imap.ssl.trust", "*");
 
-      Session session = Session.getInstance(props, null);
-
-      Store store = session.getStore(IMAP);
-      int port = Integer.parseUnsignedInt(details.getImapPort());
-
-      logger.info("Connecting to IMAP Inbox ");
-      if (details.getImapUrl() == null || details.getImapUrl().isEmpty()) {
-        logger.info(
-            "Connecting to IMAP Inbox using the imap url {} and port {}",
-            StringEscapeUtils.escapeJava(details.getDirectHost()),
-            port);
-        store.connect(
-            details.getDirectHost(), port, details.getDirectUser(), details.getDirectPwd());
-      } else {
-        logger.info(
-            "Connecting to IMAP Inbox using imap url {} and port {}",
-            StringEscapeUtils.escapeJava(details.getDirectHost()),
-            port);
-        store.connect(details.getImapUrl(), port, details.getDirectUser(), details.getDirectPwd());
-      }
+      Session session = Session.getInstance(createConnectionProperties(), null);
+      Store store = connectToStore(session.getStore(IMAP), details);
 
       Folder inbox = store.getFolder(INBOX);
       inbox.open(Folder.READ_WRITE);
@@ -113,8 +82,7 @@ public class DirectResponseReceiver extends RRReceiver {
         String senderAddress = froms == null ? null : ((InternetAddress) froms[0]).getAddress();
         logger.info("Sender Address :{}", senderAddress);
 
-        if (message.getContent() instanceof Multipart) {
-          Multipart multipart = (Multipart) message.getContent();
+        if (message.getContent() instanceof Multipart multipart) {
           for (int i = 0; i < multipart.getCount(); i++) {
             BodyPart bodyPart = multipart.getBodyPart(i);
 
@@ -152,32 +120,20 @@ public class DirectResponseReceiver extends RRReceiver {
     }
   }
 
+  @NotNull
+  private static Properties createConnectionProperties() {
+    Properties props = new Properties();
+    props.put("mail.imap.ssl.enable", "true");
+    props.put("mail.imap.ssl.checkserveridentity", "true");
+    return props;
+  }
+
   public void deleteMail(LaunchDetails details, String username, String password) throws Exception {
 
-    logger.info("Deleting mail of User:{}{}", username, password);
+    logger.info("Deleting mail of User:{}", username);
 
-    Properties props = new Properties();
-
-    props.setProperty("mail.imap.ssl.trust", "*");
-    props.setProperty("mail.imap.ssl.enable", "true");
-    Session session = Session.getInstance(props, null);
-
-    Store store = session.getStore("imap");
-    int port = Integer.parseUnsignedInt(details.getImapPort());
-
-    if (details.getImapUrl() == null || details.getImapUrl().isEmpty()) {
-      logger.info(
-          "Connecting to IMAP Inbox using the imap url {} and port {}",
-          StringEscapeUtils.escapeJava(details.getDirectHost()),
-          port);
-      store.connect(details.getDirectHost(), port, details.getDirectUser(), details.getDirectPwd());
-    } else {
-      logger.info(
-          "Connecting to IMAP Inbox using imap url {} and port {}",
-          StringEscapeUtils.escapeJava(details.getDirectHost()),
-          port);
-      store.connect(details.getImapUrl(), port, details.getDirectUser(), details.getDirectPwd());
-    }
+    Session session = Session.getInstance(createConnectionProperties(), null);
+    Store store = connectToStore(session.getStore("imap"), details);
 
     Folder inbox = store.getFolder(INBOX);
     inbox.open(Folder.READ_WRITE);
@@ -192,5 +148,22 @@ public class DirectResponseReceiver extends RRReceiver {
     }
 
     inbox.close(true);
+  }
+
+  private Store connectToStore(Store store, LaunchDetails details) throws MessagingException {
+    int port = Integer.parseUnsignedInt(details.getImapPort());
+
+    String imapHost;
+    if (details.getImapUrl() == null || details.getImapUrl().isEmpty()) {
+      imapHost = details.getDirectHost();
+    } else {
+      imapHost = details.getImapUrl();
+    }
+    logger.info(
+        "Connecting to IMAP Inbox using imap url {} and port {}",
+        StringEscapeUtils.escapeJava(imapHost),
+        port);
+    store.connect(details.getImapUrl(), port, details.getDirectUser(), details.getDirectPwd());
+    return store;
   }
 }

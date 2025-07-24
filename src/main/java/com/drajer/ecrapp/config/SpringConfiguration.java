@@ -6,7 +6,13 @@ import ca.uhn.fhir.rest.client.api.IGenericClient;
 import ca.uhn.fhir.rest.client.interceptor.BearerTokenAuthInterceptor;
 import com.drajer.ecrapp.fhir.utils.FHIRRetryTemplateConfig;
 import com.drajer.ecrapp.fhir.utils.ecrretry.RetryStatusCode;
+import java.util.concurrent.TimeUnit;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
+import okhttp3.OkHttpClient;
+import org.opencds.cqf.cql.evaluator.spring.EvaluatorConfiguration;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -37,6 +43,9 @@ import org.springframework.retry.support.RetryTemplate;
 @Configuration
 @EnableAutoConfiguration(exclude = HibernateJpaAutoConfiguration.class)
 public class SpringConfiguration {
+
+  @Value("${disable.hostname.verifier}")
+  private boolean disableHostnameVerifier;
 
   @Autowired RetryStatusCode retryStatusCode;
   public static final String ERSD_FHIR_BASE_SERVER = "https://ersd.aimsplatform.org/api/fhir";
@@ -73,9 +82,26 @@ public class SpringConfiguration {
 
     return template;
   }
+
   // Needed for the evaluator configuration
   @Bean
   public FhirContext fhirContext() {
     return ctx;
+  }
+
+  @Bean
+  public OkHttpClient okHttpClient() {
+    return new OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(300, TimeUnit.SECONDS)
+        .writeTimeout(300, TimeUnit.SECONDS)
+        .hostnameVerifier(
+            new HostnameVerifier() {
+              @Override
+              public boolean verify(String hostname, SSLSession sslSession) {
+                return true;
+              }
+            })
+        .build();
   }
 }

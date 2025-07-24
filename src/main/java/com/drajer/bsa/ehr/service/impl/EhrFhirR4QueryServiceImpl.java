@@ -129,6 +129,7 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       "http://terminology.hl7.org/CodeSystem/condition-clinical";
   private static final String CONDITION_VERIFICATION_STATUS_SYSTEM_URL =
       "http://terminology.hl7.org/CodeSystem/condition-ver-status";
+
   /**
    * The attribute stores the custom queries for each KAR.
    *
@@ -254,7 +255,7 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
     // Get Patient by Id always
     Resource res =
         getResourceById(
-            client, context, PATIENT_RESOURCE, kd.getNotificationContext().getPatientId());
+            client, context, PATIENT_RESOURCE, kd.getNotificationContext().getPatientId(), true);
 
     if (res != null && res.getResourceType() != ResourceType.OperationOutcome) {
 
@@ -285,7 +286,8 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
               client,
               context,
               ResourceType.Encounter.toString(),
-              kd.getNotificationContext().getNotificationResourceId());
+              kd.getNotificationContext().getNotificationResourceId(),
+              true);
 
       if (enc != null && enc.getResourceType() != ResourceType.OperationOutcome) {
 
@@ -350,7 +352,7 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
     // Get Patient by Id always
     Resource res =
         getResourceById(
-            client, context, PATIENT_RESOURCE, kd.getNotificationContext().getPatientId());
+            client, context, PATIENT_RESOURCE, kd.getNotificationContext().getPatientId(), true);
     if (res != null) {
 
       logger.info(
@@ -471,15 +473,6 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
     data.getHealthcareSetting().setEhrAccessTokenExpirationTime(Date.from(expirationInstantTime));
 
     hsDao.saveOrUpdate(data.getHealthcareSetting());
-
-    /**
-     * data.getNotificationContext().setEhrAccessToken(accessToken);
-     * data.getNotificationContext().setEhrAccessTokenExpiryDuration(expirationDuration);
-     * data.getNotificationContext().setEhrAccessTokenExpirationTime(Date.from(expirationInstantTime));
-     */
-
-    // Save both Notification Context and Healthcare Setting.
-
   }
 
   /**
@@ -560,7 +553,11 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
               Practitioner practitioner =
                   (Practitioner)
                       getResourceById(
-                          client, context, ResourceType.Practitioner.toString(), practitionerID);
+                          client,
+                          context,
+                          ResourceType.Practitioner.toString(),
+                          practitionerID,
+                          true);
               if (practitioner != null && !practitionerMap.containsKey(practitionerID)) {
                 practitioners.add(practitioner);
                 kd.storeResourceById(practitionerID, practitioner);
@@ -584,7 +581,8 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
                       client,
                       context,
                       "Organization",
-                      organizationReference.getReferenceElement().getIdPart());
+                      organizationReference.getReferenceElement().getIdPart(),
+                      true);
           if (organization != null) {
             organizations.add(organization);
             kd.storeResourceById(
@@ -608,7 +606,8 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
                         client,
                         context,
                         "Location",
-                        locationReference.getReferenceElement().getIdPart());
+                        locationReference.getReferenceElement().getIdPart(),
+                        true);
             if (locationResource != null) {
               locations.add(locationResource);
               kd.storeResourceById(
@@ -709,7 +708,8 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
   }
 
   @Override
-  public Resource getResourceById(KarProcessingData kd, String resourceName, String resourceId) {
+  public Resource getResourceById(
+      KarProcessingData kd, String resourceName, String resourceId, boolean applyFiltering) {
 
     logger.info(LOG_FHIR_CTX_GET);
     FhirContext context = fhirContextInitializer.getFhirContext(R4);
@@ -717,11 +717,15 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
     logger.info(LOG_INIT_FHIR_CLIENT);
     IGenericClient client = getClient(kd, context);
 
-    return getResourceById(client, context, resourceName, resourceId);
+    return getResourceById(client, context, resourceName, resourceId, applyFiltering);
   }
 
   public Resource getResourceById(
-      IGenericClient genericClient, FhirContext context, String resourceName, String resourceId) {
+      IGenericClient genericClient,
+      FhirContext context,
+      String resourceName,
+      String resourceId,
+      boolean applyFiltering) {
 
     Resource resource = null;
 
@@ -732,7 +736,7 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       resource =
           (Resource) (genericClient.read().resource(resourceName).withId(resourceId).execute());
 
-      if (!isValidResource(resource)) resource = null;
+      if (applyFiltering && !isValidResource(resource)) resource = null;
 
     } catch (BaseServerResponseException responseException) {
       if (responseException.getOperationOutcome() != null) {
@@ -1167,8 +1171,9 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       MedicationRequest mr = (MedicationRequest) res;
 
       // Ignore observations that should not be included.
-      if (mr.getStatus() != null
+      if (mr.hasStatus()
           && (mr.getStatus() == MedicationRequestStatus.ENTEREDINERROR
+              || mr.getStatus() == MedicationRequestStatus.STOPPED
               || mr.getStatus() == MedicationRequestStatus.CANCELLED
               || mr.getStatus() == MedicationRequestStatus.DRAFT
               || mr.getStatus() == MedicationRequestStatus.UNKNOWN)) {
@@ -1185,8 +1190,9 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       MedicationAdministration ma = (MedicationAdministration) res;
 
       // Ignore observations that should not be included.
-      if (ma.getStatus() != null
+      if (ma.hasStatus()
           && (ma.getStatus() == MedicationAdministrationStatus.ENTEREDINERROR
+              || ma.getStatus() == MedicationAdministrationStatus.STOPPED
               || ma.getStatus() == MedicationAdministrationStatus.NOTDONE
               || ma.getStatus() == MedicationAdministrationStatus.UNKNOWN)) {
 
@@ -1202,8 +1208,9 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       MedicationStatement ms = (MedicationStatement) res;
 
       // Ignore observations that should not be included.
-      if (ms.getStatus() != null
+      if (ms.hasStatus()
           && (ms.getStatus() == MedicationStatementStatus.ENTEREDINERROR
+              || ms.getStatus() == MedicationStatementStatus.STOPPED
               || ms.getStatus() == MedicationStatementStatus.NOTTAKEN
               || ms.getStatus() == MedicationStatementStatus.UNKNOWN)) {
 
@@ -1319,85 +1326,158 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       MedicationRequest mreq = (MedicationRequest) res;
 
       // Retrieve any medications
-      if (mreq.getMedication() instanceof Reference) {
+      if (mreq.hasMedicationReference()) {
         Reference medRef = (Reference) mreq.getMedication();
-        Resource secRes =
-            kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
 
-        if (secRes == null) {
-          secRes =
-              getResourceById(
-                  genericClient,
-                  context,
-                  ResourceType.Medication.toString(),
-                  medRef.getReferenceElement().getIdPart());
-        }
+        if (medRef.getReferenceElement().hasIdPart()) {
+          Resource secRes =
+              kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
 
-        if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+          if (secRes == null) {
+            secRes =
+                getResourceById(
+                    genericClient,
+                    context,
+                    ResourceType.Medication.toString(),
+                    medRef.getReferenceElement().getIdPart(),
+                    true);
+          }
 
-          logger.info(
-              " Adding secondary Medication resource for MedicationRequest with id {}",
-              secRes.getId());
-          kd.addResourceByType(secRes.getResourceType(), secRes);
-          kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
-        }
-      }
+          if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+
+            logger.info(
+                " Adding secondary Medication resource for MedicationRequest with id {}",
+                secRes.getId());
+            kd.addResourceByType(secRes.getResourceType(), secRes);
+            kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
+          }
+        } // has Id Part in Reference
+      } // has MedicationReference
     } else if (res != null && rType == ResourceType.MedicationAdministration) {
 
       MedicationAdministration mAdm = (MedicationAdministration) res;
 
       // Retrieve any medications
-      if (mAdm.getMedication() instanceof Reference) {
+      if (mAdm.hasMedicationReference()) {
         Reference medRef = (Reference) mAdm.getMedication();
-        Resource secRes =
-            kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
 
-        if (secRes == null) {
-          secRes =
-              getResourceById(
-                  genericClient,
-                  context,
-                  ResourceType.Medication.toString(),
-                  medRef.getReferenceElement().getIdPart());
-        }
+        if (medRef.getReferenceElement().hasIdPart()) {
+          Resource secRes =
+              kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
 
-        if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+          if (secRes == null) {
+            secRes =
+                getResourceById(
+                    genericClient,
+                    context,
+                    ResourceType.Medication.toString(),
+                    medRef.getReferenceElement().getIdPart(),
+                    true);
+          }
 
-          logger.info(
-              " Adding secondary Medication resource for MedicationAdministration with id {}",
-              secRes.getId());
-          kd.addResourceByType(secRes.getResourceType(), secRes);
-          kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
+          if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+
+            logger.info(
+                " Adding secondary Medication resource for MedicationAdministration with id {}",
+                secRes.getId());
+            kd.addResourceByType(secRes.getResourceType(), secRes);
+            kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
+          }
+        } // has Id Part in Reference
+      }
+
+      if (mAdm.hasRequest()) {
+        Reference medRequestRef = (Reference) mAdm.getRequest();
+
+        if (medRequestRef.getReferenceElement().hasIdPart()) {
+          Resource secRes =
+              kd.getResourceById(
+                  medRequestRef.getReferenceElement().getIdPart(), ResourceType.MedicationRequest);
+
+          if (secRes == null) {
+            secRes =
+                getResourceById(
+                    genericClient,
+                    context,
+                    ResourceType.MedicationRequest.toString(),
+                    medRequestRef.getReferenceElement().getIdPart(),
+                    false);
+          }
+
+          if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+
+            logger.info(
+                " Adding secondary Medication Request resource for MedicationAdministration with id {}",
+                secRes.getId());
+            kd.addResourceByType(secRes.getResourceType(), secRes);
+            kd.storeResourceById(medRequestRef.getReferenceElement().getIdPart(), secRes);
+          }
         }
       }
+    } else if (res != null && rType == ResourceType.MedicationStatement) {
+
+      MedicationStatement mst = (MedicationStatement) res;
+
+      // Retrieve any medications
+      if (mst.hasMedicationReference()) {
+        Reference medRef = (Reference) mst.getMedication();
+
+        if (medRef.getReferenceElement().hasIdPart()) {
+          Resource secRes =
+              kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
+
+          if (secRes == null) {
+            secRes =
+                getResourceById(
+                    genericClient,
+                    context,
+                    ResourceType.Medication.toString(),
+                    medRef.getReferenceElement().getIdPart(),
+                    true);
+          }
+
+          if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+
+            logger.info(
+                " Adding secondary Medication resource for MedicationStatement with id {}",
+                secRes.getId());
+            kd.addResourceByType(secRes.getResourceType(), secRes);
+            kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
+          }
+        } // has Id Part in Reference
+      } // has MedicationReference
     } else if (res != null && rType == ResourceType.MedicationDispense) {
 
       MedicationDispense mDisp = (MedicationDispense) res;
 
       // Retrieve any medications
-      if (mDisp.getMedication() instanceof Reference) {
+      if (mDisp.hasMedicationReference()) {
         Reference medRef = (Reference) mDisp.getMedication();
-        Resource secRes =
-            kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
 
-        if (secRes == null) {
-          secRes =
-              getResourceById(
-                  genericClient,
-                  context,
-                  ResourceType.Medication.toString(),
-                  medRef.getReferenceElement().getIdPart());
-        }
+        if (medRef.getReferenceElement().hasIdPart()) {
+          Resource secRes =
+              kd.getResourceById(medRef.getReferenceElement().getIdPart(), ResourceType.Medication);
 
-        if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+          if (secRes == null) {
+            secRes =
+                getResourceById(
+                    genericClient,
+                    context,
+                    ResourceType.Medication.toString(),
+                    medRef.getReferenceElement().getIdPart(),
+                    true);
+          }
 
-          logger.info(
-              " Adding secondary Medidcation resource for MedicationDispense with id {}",
-              secRes.getId());
-          kd.addResourceByType(secRes.getResourceType(), secRes);
-          kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
-        }
-      }
+          if (secRes != null && secRes.getResourceType() != ResourceType.OperationOutcome) {
+
+            logger.info(
+                " Adding secondary Medidcation resource for MedicationDispense with id {}",
+                secRes.getId());
+            kd.addResourceByType(secRes.getResourceType(), secRes);
+            kd.storeResourceById(medRef.getReferenceElement().getIdPart(), secRes);
+          }
+        } // has Id Part in Reference
+      } // has MedicationReference
     } else if (res != null && rType == ResourceType.Immunization) {
 
       Immunization immz = (Immunization) res;
@@ -1415,6 +1495,12 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
           }
         }
       }
+
+      if (immz.hasManufacturer()
+          && isResourceOfType(immz.getManufacturer(), ResourceType.Organization)) {
+        getAndAddSecondaryResource(
+            kd, immz.getManufacturer(), ResourceType.Organization, genericClient, context);
+      }
     } else if (res != null && rType == ResourceType.Observation) {
 
       Observation observation = (Observation) res;
@@ -1430,9 +1516,29 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
           }
         }
       }
+      if (observation.hasSpecimen()) {
+
+        Reference specimen = observation.getSpecimen();
+
+        if (isResourceOfType(specimen, ResourceType.Specimen)) {
+          getAndAddSecondaryResource(kd, specimen, ResourceType.Specimen, genericClient, context);
+        }
+      }
+
     } else if (res != null && rType == ResourceType.DiagnosticReport) {
 
       DiagnosticReport report = (DiagnosticReport) res;
+
+      if (report.hasSpecimen()) {
+
+        List<Reference> specimens = report.getSpecimen();
+
+        for (Reference specimen : specimens) {
+          if (isResourceOfType(specimen, ResourceType.Specimen)) {
+            getAndAddSecondaryResource(kd, specimen, ResourceType.Specimen, genericClient, context);
+          }
+        }
+      }
 
       if (report.getResult() != null) {
 
@@ -1449,7 +1555,8 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
                     genericClient,
                     context,
                     ResourceType.Observation.toString(),
-                    r.getReferenceElement().getIdPart());
+                    r.getReferenceElement().getIdPart(),
+                    true);
           }
 
           if (secRes != null
@@ -1477,6 +1584,16 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
                 }
               }
             }
+
+            if (observation.hasSpecimen()) {
+
+              Reference specimen = observation.getSpecimen();
+
+              if (isResourceOfType(specimen, ResourceType.Specimen)) {
+                getAndAddSecondaryResource(
+                    kd, specimen, ResourceType.Specimen, genericClient, context);
+              }
+            }
           }
         }
       }
@@ -1497,7 +1614,7 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
     if (secRes == null) {
       secRes =
           getResourceById(
-              genericClient, context, type.toString(), ref.getReferenceElement().getIdPart());
+              genericClient, context, type.toString(), ref.getReferenceElement().getIdPart(), true);
     }
 
     addResourceToContext(kd, secRes, ref.getReferenceElement().getIdPart(), false);
@@ -1664,7 +1781,8 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
       logger.debug(LOG_INIT_FHIR_CLIENT);
       IGenericClient client = getClient(data, context);
 
-      Resource res = getResourceById(client, context, ResourceType.Encounter.toString(), encId);
+      Resource res =
+          getResourceById(client, context, ResourceType.Encounter.toString(), encId, true);
 
       if (res != null) enc = (Encounter) res;
     }
@@ -1715,6 +1833,16 @@ public class EhrFhirR4QueryServiceImpl implements EhrQueryService {
         && actor.getReferenceElement().hasResourceType()
         && ResourceType.fromCode(actor.getReferenceElement().getResourceType())
             == ResourceType.Practitioner) {
+      return true;
+    }
+
+    return false;
+  }
+
+  private boolean isResourceOfType(Reference actor, ResourceType type) {
+    if (actor.hasReferenceElement()
+        && actor.getReferenceElement().hasResourceType()
+        && ResourceType.fromCode(actor.getReferenceElement().getResourceType()) == type) {
       return true;
     }
 

@@ -100,8 +100,9 @@ off hours (non peak hours). This kind of configuration can be achieved by the Of
 
 EHR implementers can configure the EHR Product name and version that the ecrNowApp interfaces with using the two application properties
 
-* ehr.product.name="EHR Product Name: for e.g., AthenaOne, AthenaPractice, CernerMillenium"
-* ehr.product.version="EHR ProductVersion"
+* ehr.name="Ehr Vendor Company Name: for e.g., Athena, Oracle".
+* ehr.product.name="EHR Product Name: for e.g., AthenaOne Clinicals, AthenaPractice, CernerMillenium"
+* ehr.product.version="EHR ProductVersion: for e.g., 1.0.0"
 
 If these are present in the application.properties, then an author participant is added to the CDA eICR to convey this information.
 If it is not present, the author is not added. 
@@ -129,3 +130,8 @@ To control the timing there is an application property that specifies the number
 * startup.timedelay=10 
 
 The above introduces a delay of 10 seconds before accepting launch patient requests.  
+
+## 2.14 Configuring Token Refresh threshold
+
+This value is used to refresh the access token before it expires, the value is supposed to be in seconds and will be subtracted from the access token expiration time. 
+* token.refresh.threshold=15

@@ -13,6 +13,7 @@ import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.Immunization;
 import org.hl7.fhir.r4.model.Immunization.ImmunizationPerformerComponent;
 import org.hl7.fhir.r4.model.Immunization.ImmunizationStatus;
+import org.hl7.fhir.r4.model.Organization;
 import org.hl7.fhir.r4.model.Practitioner;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.ResourceType;
@@ -25,7 +26,8 @@ public class CdaImmunizationGenerator {
 
   private static final Logger logger = LoggerFactory.getLogger(CdaImmunizationGenerator.class);
 
-  public static String generateImmunizationSection(R4FhirData data, LaunchDetails details) {
+  public static String generateImmunizationSection(
+      R4FhirData data, LaunchDetails details, String version) {
 
     StringBuilder sb = new StringBuilder(2000);
 
@@ -154,6 +156,12 @@ public class CdaImmunizationGenerator {
                   CdaGeneratorConstants.EFF_TIME_EL_NAME, CdaGeneratorConstants.NF_NI));
         }
 
+        if (imm.hasRoute() && imm.getRoute().hasCoding()) {
+          sb.append(
+              CdaFhirUtilities.getCodeableConceptXml(
+                  imm.getRoute(), CdaGeneratorConstants.ROUTE_CODE_EL_NAME, ""));
+        }
+
         if (imm.hasDoseQuantity()) {
           sb.append(
               CdaFhirUtilities.getQuantityXml(
@@ -199,6 +207,11 @@ public class CdaImmunizationGenerator {
         }
 
         sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.MANU_MAT_EL_NAME));
+
+        if (imm.hasManufacturer()) {
+          sb.append(getManufacturerXml(imm, data));
+        }
+
         sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.MAN_PROD_EL_NAME));
         sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.CONSUMABLE_EL_NAME));
 
@@ -222,13 +235,37 @@ public class CdaImmunizationGenerator {
     return sb.toString();
   }
 
+  public static String getManufacturerXml(Immunization imm, R4FhirData data) {
+
+    StringBuilder retVal = new StringBuilder();
+
+    Organization manufacturer = null;
+
+    if (imm.getManufacturer().hasReference())
+      manufacturer =
+          data.getOrganizationForId(imm.getManufacturer().getReferenceElement().getIdPart());
+
+    if (manufacturer != null && manufacturer.hasName()) {
+
+      retVal.append(
+          CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.MANUFACTURER_ORGANIZATION));
+      retVal.append(
+          CdaGeneratorUtils.getXmlForText(
+              CdaGeneratorConstants.NAME_EL_NAME, manufacturer.getName()));
+      retVal.append(
+          CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.MANUFACTURER_ORGANIZATION));
+    }
+
+    return retVal.toString();
+  }
+
   public static String getXmlForPerformer(
       List<ImmunizationPerformerComponent> izcs, R4FhirData data) {
 
     StringBuilder sb = new StringBuilder(400);
     String functionCode = "";
 
-    if (izcs != null & data != null) {
+    if (izcs != null && data != null) {
       for (ImmunizationPerformerComponent perf : izcs) {
         Reference actor = perf.getActor();
 
@@ -290,5 +327,11 @@ public class CdaImmunizationGenerator {
     sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.COMP_EL_NAME));
 
     return sb.toString();
+  }
+
+  public static Object generateR31ImmunizationSection(
+      R4FhirData data, LaunchDetails details, String version) {
+    // TODO Auto-generated method stub
+    return null;
   }
 }

@@ -1,13 +1,14 @@
 package com.drajer.cdafromr4;
 
+import static com.drajer.cda.utils.CdaGeneratorConstants.FHIR_NPI_URL;
+
 import com.drajer.cda.utils.CdaGeneratorConstants;
 import com.drajer.cda.utils.CdaGeneratorUtils;
 import com.drajer.eca.model.ActionRepo;
+import com.drajer.ecrapp.config.AppConfig;
 import com.drajer.ecrapp.model.Eicr;
 import com.drajer.sof.model.LaunchDetails;
 import com.drajer.sof.model.R4FhirData;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,7 +42,7 @@ public class CdaHeaderGenerator {
   private static final Properties properties = new Properties();
   private static final Logger logger = LoggerFactory.getLogger(CdaHeaderGenerator.class);
 
-  private static String SW_APP_VERSION = "Version 3.1.5";
+  private static String SW_APP_VERSION = "Version 3.1.9";
   private static String SW_APP_NAME = "ecrNowApp";
   private static final String SPRING_PROFILES_ACTIVE = "spring.profiles.active";
   private static final String DEFAULT_PROPERTIES_FILE = "application.properties";
@@ -56,21 +57,7 @@ public class CdaHeaderGenerator {
   }
 
   public static void loadProperties() {
-    String propertiesFileName = getPropertiesFileName();
-
-    try (InputStream input =
-        CdaHeaderGenerator.class.getClassLoader().getResourceAsStream(propertiesFileName)) {
-      if (input != null) {
-        Properties properties = new Properties();
-        properties.load(input);
-        appProps.putAll((Map) properties);
-
-      } else {
-        logger.error("Properties file {} not found in classpath!", propertiesFileName);
-      }
-    } catch (IOException e) {
-      logger.error("Error loading properties file :{} ", e);
-    }
+    appProps = (HashMap<String, String>) AppConfig.getAllProperties();
   }
 
   private static String getPropertiesFileName() {
@@ -80,13 +67,14 @@ public class CdaHeaderGenerator {
         : DEFAULT_PROPERTIES_FILE;
   }
 
-  public static String createCdaHeader(R4FhirData data, LaunchDetails details, Eicr ecr) {
+  public static String createCdaHeader(
+      R4FhirData data, LaunchDetails details, Eicr ecr, String version) {
 
     StringBuilder eICRHeader = new StringBuilder();
 
     if (data != null) {
 
-      eICRHeader.append(CdaGeneratorUtils.getXmlHeaderForClinicalDocument());
+      eICRHeader.append(CdaGeneratorUtils.getXmlHeaderForClinicalDocument(version));
 
       // Set the clinical document id.
       String docId = CdaGeneratorUtils.getGuid();
@@ -134,7 +122,12 @@ public class CdaHeaderGenerator {
               details.getAssigningAuthorityId(),
               String.valueOf(details.getSetId())));
 
-      Integer vernum = ActionRepo.getInstance().getEicrRRService().getMaxVersionId(ecr);
+      Integer vernum = 0;
+      if (version.contains("3.")) {
+
+      } else {
+        vernum = ActionRepo.getInstance().getEicrRRService().getMaxVersionId(ecr);
+      }
 
       if (vernum == 0) {
         eICRHeader.append(
@@ -328,9 +321,7 @@ public class CdaHeaderGenerator {
     if (loc != null) {
 
       logger.info("Location data is present, using it to populate LOCATION detail in XML");
-      Identifier npi =
-          CdaFhirUtilities.getIdentifierForSystem(
-              loc.getIdentifier(), CdaGeneratorConstants.FHIR_NPI_URL);
+      Identifier npi = CdaFhirUtilities.getIdentifierForSystem(loc.getIdentifier(), FHIR_NPI_URL);
 
       if (npi != null) {
         sb.append(
@@ -377,9 +368,7 @@ public class CdaHeaderGenerator {
 
       logger.info(
           "Location data is not present, using Organization data to populate LOCATION detail in XML");
-      Identifier npi =
-          CdaFhirUtilities.getIdentifierForSystem(
-              org.getIdentifier(), CdaGeneratorConstants.FHIR_NPI_URL);
+      Identifier npi = CdaFhirUtilities.getIdentifierForSystem(org.getIdentifier(), FHIR_NPI_URL);
 
       if (npi != null) {
         sb.append(
@@ -452,19 +441,16 @@ public class CdaHeaderGenerator {
     sb.append(CdaGeneratorUtils.getXmlForIIUsingGuid());
     Address addr = null;
     sb.append(CdaFhirUtilities.getAddressXml(addr));
+    List<ContactPoint> cps = null;
+    sb.append(CdaFhirUtilities.getTelecomXml(cps, true, false));
     sb.append(
         CdaGeneratorUtils.getXmlForStartElement(
             CdaGeneratorConstants.ASSIGNED_AUTHORING_DEVICE_EL_NAME));
     sb.append(
-        CdaGeneratorUtils.getXmlForElementWithAttribute(
-            CdaGeneratorConstants.MANU_MODEL_NAME_EL_NAME,
-            CdaGeneratorConstants.DISPLAYNAME_WITH_EQUAL,
-            manufacturer));
+        CdaGeneratorUtils.getXmlForText(
+            CdaGeneratorConstants.MANU_MODEL_NAME_EL_NAME, manufacturer));
     sb.append(
-        CdaGeneratorUtils.getXmlForElementWithAttribute(
-            CdaGeneratorConstants.SOFTWARE_NAME_EL_NAME,
-            CdaGeneratorConstants.DISPLAYNAME_WITH_EQUAL,
-            swversion));
+        CdaGeneratorUtils.getXmlForText(CdaGeneratorConstants.SOFTWARE_NAME_EL_NAME, swversion));
 
     sb.append(
         CdaGeneratorUtils.getXmlForEndElement(
@@ -545,9 +531,24 @@ public class CdaHeaderGenerator {
     if (data.getOrganization() != null && data.getOrganization().hasName()) {
 
       sb.append(CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.REP_ORG_EL_NAME));
+      Organization org = data.getOrganization();
+      Identifier id =
+          org.hasIdentifier()
+              ? CdaFhirUtilities.getIdentifierForSystem(org.getIdentifier(), FHIR_NPI_URL)
+              : null;
+      if (id != null && id.hasSystem() && id.hasValue()) {
+        sb.append(
+            CdaGeneratorUtils.getXmlForII(
+                CdaGeneratorUtils.getRootOid(id.getSystem(), id.getValue()), id.getValue()));
+      } else {
+        sb.append(CdaGeneratorUtils.getXmlForII(CdaGeneratorConstants.AUTHOR_NPI_AA));
+      }
       sb.append(
           CdaGeneratorUtils.getXmlForText(
               CdaGeneratorConstants.NAME_EL_NAME, data.getOrganization().getName()));
+      sb.append(CdaFhirUtilities.getTelecomXml(org.getTelecom(), false, false));
+      sb.append(CdaFhirUtilities.getAddressXml(data.getOrganization().getAddress(), false));
+
       sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.REP_ORG_EL_NAME));
     }
 
@@ -563,14 +564,14 @@ public class CdaHeaderGenerator {
     StringBuilder sb = new StringBuilder(200);
     if (org != null) {
 
-      Identifier id = org.getIdentifierFirstRep();
-
-      if (id != null && !id.isEmpty()) {
-
+      Identifier id =
+          org.hasIdentifier()
+              ? CdaFhirUtilities.getIdentifierForSystem(org.getIdentifier(), FHIR_NPI_URL)
+              : null;
+      if (id != null && id.hasSystem() && id.hasValue()) {
         sb.append(
             CdaGeneratorUtils.getXmlForII(
-                CdaGeneratorUtils.getRootOid(id.getSystem(), details.getAssigningAuthorityId()),
-                id.getValue()));
+                CdaGeneratorUtils.getRootOid(id.getSystem(), id.getValue()), id.getValue()));
       } else {
         sb.append(
             CdaGeneratorUtils.getXmlForII(
@@ -685,7 +686,16 @@ public class CdaHeaderGenerator {
     sb.append(
         CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.HEALTHCARE_FACILITY_EL_NAME));
 
-    sb.append(getLocationXml(data.getLocation(), data.getOrganization(), details));
+    if (data.getLocation() != null && data.getLocation().hasAddress()) {
+      Address address = data.getLocation().getAddress();
+      if (address.hasCity() && address.hasState() && address.hasPostalCode() && address.hasLine()) {
+        sb.append(getLocationXml(data.getLocation(), data.getOrganization(), details));
+      } else {
+        sb.append(getLocationXml(null, data.getOrganization(), details));
+      }
+    } else {
+      sb.append(getLocationXml(null, data.getOrganization(), details));
+    }
 
     sb.append(
         CdaGeneratorUtils.getXmlForStartElement(
@@ -952,9 +962,10 @@ public class CdaHeaderGenerator {
     // Adding Guardian
     if (p.getContact() != null && !p.getContact().isEmpty()) {
 
-      ContactComponent guardianContact = CdaFhirUtilities.getGuardianContact(p.getContact());
+      List<ContactComponent> guardianContacts =
+          CdaFhirUtilities.getGuardianContacts(p.getContact());
 
-      if (guardianContact != null) {
+      for (ContactComponent guardianContact : guardianContacts) {
 
         patientDetails.append(
             CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.GUARDIAN_EL_NAME));

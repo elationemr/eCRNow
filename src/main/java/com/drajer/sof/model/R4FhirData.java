@@ -1,24 +1,10 @@
 package com.drajer.sof.model;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import org.hl7.fhir.r4.model.Address;
-import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.Condition;
-import org.hl7.fhir.r4.model.DiagnosticReport;
-import org.hl7.fhir.r4.model.Encounter;
-import org.hl7.fhir.r4.model.Immunization;
-import org.hl7.fhir.r4.model.Location;
-import org.hl7.fhir.r4.model.Medication;
-import org.hl7.fhir.r4.model.MedicationAdministration;
-import org.hl7.fhir.r4.model.MedicationRequest;
-import org.hl7.fhir.r4.model.MedicationStatement;
-import org.hl7.fhir.r4.model.Observation;
-import org.hl7.fhir.r4.model.Organization;
-import org.hl7.fhir.r4.model.Patient;
-import org.hl7.fhir.r4.model.Practitioner;
-import org.hl7.fhir.r4.model.Procedure;
-import org.hl7.fhir.r4.model.ServiceRequest;
+import java.util.Map;
+import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +21,7 @@ public class R4FhirData extends FhirData {
   private Location location;
   private List<Location> locationList;
   private Organization organization;
+  private List<Organization> organizationList;
   private List<Condition> conditions;
   private List<Condition> encounterDiagnosisConditions;
   private List<Condition> pregnancyConditions;
@@ -55,16 +42,19 @@ public class R4FhirData extends FhirData {
   private List<Observation> vaccineCredObs;
   private List<Observation> residencyObs;
   private List<Observation> nationalityObs;
+  private List<Observation> smokingObs;
   private List<Immunization> immunizations;
-  private List<MedicationStatement> medications;
+  private List<MedicationStatement> medicationStatements;
   private List<MedicationRequest> medicationRequests;
   private List<MedicationAdministration> medicationAdministrations;
+  private List<MedicationDispense> medicationDispenses;
   private List<Medication> medicationList;
   private List<ServiceRequest> serviceRequests;
   private List<Procedure> procedureList;
-
   private Address jurisdiction;
   private List<Address> jurisdictions;
+  private List<Specimen> specimenList;
+  private List<Observation> pregnancyIntentionObservations;
 
   public void prepareJurisdicationData() {
 
@@ -121,6 +111,7 @@ public class R4FhirData extends FhirData {
   public R4FhirData() {
 
     locationList = new ArrayList<>();
+    organizationList = new ArrayList<>();
     practitionersList = new ArrayList<>();
     conditions = new ArrayList<>();
     encounterDiagnosisConditions = new ArrayList<>();
@@ -133,10 +124,12 @@ public class R4FhirData extends FhirData {
     travelObs = new ArrayList<>();
     pregnancyObs = new ArrayList<>();
     occupationObs = new ArrayList<>();
+    smokingObs = new ArrayList<>();
     immunizations = new ArrayList<>();
-    medications = new ArrayList<>();
+    medicationStatements = new ArrayList<>();
     medicationRequests = new ArrayList<>();
     medicationAdministrations = new ArrayList<>();
+    medicationDispenses = new ArrayList<>();
     serviceRequests = new ArrayList<>();
     medicationList = new ArrayList<>();
     procedureList = new ArrayList<>();
@@ -151,6 +144,9 @@ public class R4FhirData extends FhirData {
     vaccineCredObs = new ArrayList<>();
     residencyObs = new ArrayList<>();
     nationalityObs = new ArrayList<>();
+    jurisdictions = new ArrayList<>();
+    specimenList = new ArrayList<>();
+    pregnancyIntentionObservations = new ArrayList<>();
   }
 
   public Bundle getData() {
@@ -213,12 +209,28 @@ public class R4FhirData extends FhirData {
     this.locationList = locationList;
   }
 
+  public void addLocations(List<Location> locationList) {
+    this.locationList.addAll(locationList);
+  }
+
   public Organization getOrganization() {
     return organization;
   }
 
   public void setOrganization(Organization organization) {
     this.organization = organization;
+  }
+
+  public List<Organization> getOrganizationList() {
+    return organizationList;
+  }
+
+  public void setOrganizationList(List<Organization> organizationList) {
+    this.organizationList = organizationList;
+  }
+
+  public void addOrganization(List<Organization> orgList) {
+    this.organizationList.addAll(orgList);
   }
 
   public List<Condition> getConditions() {
@@ -325,12 +337,20 @@ public class R4FhirData extends FhirData {
     this.immunizations = immunizations;
   }
 
-  public List<MedicationStatement> getMedications() {
-    return medications;
+  public List<MedicationStatement> getMedicationStatements() {
+    return medicationStatements;
   }
 
-  public void setMedications(List<MedicationStatement> medications) {
-    this.medications = medications;
+  public void setMedicationStatements(List<MedicationStatement> medicationStatements) {
+    this.medicationStatements = medicationStatements;
+  }
+
+  public List<MedicationDispense> getMedicationDispenses() {
+    return medicationDispenses;
+  }
+
+  public void setMedicationDispenses(List<MedicationDispense> medicationDispenses) {
+    this.medicationDispenses = medicationDispenses;
   }
 
   public List<MedicationRequest> getMedicationRequests() {
@@ -530,6 +550,38 @@ public class R4FhirData extends FhirData {
     this.vitalObs = vitalObs;
   }
 
+  public List<Observation> getSmokingObs() {
+    return smokingObs;
+  }
+
+  public void setSmokingObs(List<Observation> smokingObs) {
+    this.smokingObs = smokingObs;
+  }
+
+  public List<Specimen> getSpecimenList() {
+    return specimenList;
+  }
+
+  public void setSpecimenList(List<Specimen> specimenList) {
+    this.specimenList = specimenList;
+  }
+
+  public void addSpecimen(List<Specimen> specimens) {
+    this.specimenList.addAll(specimens);
+  }
+
+  public List<Observation> getPregnancyIntentionObservations() {
+    return pregnancyIntentionObservations;
+  }
+
+  public void setPregnancyIntentionObservations(List<Observation> pregnancyIntentObservations) {
+    this.pregnancyIntentionObservations = pregnancyIntentObservations;
+  }
+
+  public void addPregnancyIntentionObs(List<Observation> pregnancyObs) {
+    this.pregnancyIntentionObservations.addAll(pregnancyObs);
+  }
+
   @Override
   public String toString() {
     return "R4FhirData [data="
@@ -568,14 +620,18 @@ public class R4FhirData extends FhirData {
         + pregnancyObs
         + ", occupationObs="
         + occupationObs
+        + ", smokingObs="
+        + smokingObs
         + ", immunizations="
         + immunizations
-        + ", medications="
-        + medications
+        + ", medicationStatements="
+        + medicationStatements
         + ", medicationRequests="
         + medicationRequests
         + ", medicationAdministrations="
         + medicationAdministrations
+        + ", medicationDispenses="
+        + medicationDispenses
         + ", medicationList="
         + medicationList
         + ", serviceRequests="
@@ -587,5 +643,41 @@ public class R4FhirData extends FhirData {
         + ", jurisdictions="
         + jurisdictions
         + "]";
+  }
+
+  public Map<String, Medication> getMedicationMap() {
+    Map<String, Medication> medMap = new HashMap<>();
+    if (medicationList != null && !medicationList.isEmpty()) {
+      for (Medication m : medicationList) {
+        medMap.put(m.getIdElement().getIdPart(), m);
+      }
+    }
+    return medMap;
+  }
+
+  public Organization getOrganizationForId(String id) {
+
+    if (organizationList != null) {
+      for (Organization org : organizationList) {
+
+        if (org.getId().contains(id)) {
+          return org;
+        }
+      }
+    }
+    return null;
+  }
+
+  public Specimen getSpecimenById(String id) {
+
+    logger.debug("Id for retrieving specimen = {}", id);
+    if (specimenList != null) {
+      for (Specimen sp : specimenList) {
+        if (sp.getId().contains(id)) {
+          return sp;
+        }
+      }
+    }
+    return null;
   }
 }

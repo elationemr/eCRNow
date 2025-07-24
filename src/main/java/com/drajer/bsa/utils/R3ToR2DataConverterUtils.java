@@ -6,6 +6,7 @@ import com.drajer.bsa.kar.model.BsaAction;
 import com.drajer.bsa.model.BsaTypes.ActionType;
 import com.drajer.bsa.model.BsaTypes.BsaActionStatusType;
 import com.drajer.bsa.model.KarProcessingData;
+import com.drajer.cda.utils.CdaGeneratorConstants;
 import com.drajer.eca.model.EcaUtils;
 import com.drajer.eca.model.EventTypes.JobStatus;
 import com.drajer.eca.model.MatchTriggerStatus;
@@ -17,28 +18,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.*;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
-import org.hl7.fhir.r4.model.CodeableConcept;
-import org.hl7.fhir.r4.model.Coding;
-import org.hl7.fhir.r4.model.Condition;
-import org.hl7.fhir.r4.model.DataRequirement;
-import org.hl7.fhir.r4.model.DiagnosticReport;
-import org.hl7.fhir.r4.model.Encounter;
-import org.hl7.fhir.r4.model.Immunization;
-import org.hl7.fhir.r4.model.Location;
-import org.hl7.fhir.r4.model.Medication;
-import org.hl7.fhir.r4.model.MedicationAdministration;
-import org.hl7.fhir.r4.model.MedicationRequest;
-import org.hl7.fhir.r4.model.MedicationStatement;
-import org.hl7.fhir.r4.model.Observation;
-import org.hl7.fhir.r4.model.Organization;
-import org.hl7.fhir.r4.model.Patient;
-import org.hl7.fhir.r4.model.Practitioner;
-import org.hl7.fhir.r4.model.Procedure;
-import org.hl7.fhir.r4.model.Resource;
-import org.hl7.fhir.r4.model.ResourceType;
-import org.hl7.fhir.r4.model.ServiceRequest;
+import org.hl7.fhir.r4.model.Encounter.EncounterLocationComponent;
 import org.hl7.fhir.r4.model.codesystems.ObservationCategory;
 import org.javatuples.Pair;
 import org.slf4j.Logger;
@@ -118,6 +100,7 @@ public class R3ToR2DataConverterUtils {
 
       addAdministrativeResources(null, data, r4FhirData, details, kd, act, uniqueResourceIdsByType);
       addSecondaryResources(null, data, r4FhirData, details, kd, act, uniqueResourceIdsByType);
+      setLocationAndServiceProviderOrganization(kd, r4FhirData);
 
     } else {
 
@@ -156,6 +139,27 @@ public class R3ToR2DataConverterUtils {
         details,
         observations,
         ResourceType.Observation.toString(),
+        r4DataResourceIds);
+
+    Set<Resource> specimens = kd.getResourcesByType(ResourceType.Specimen.toString());
+    addResourcesToR4FhirData(
+        dataId,
+        data,
+        r4FhirData,
+        details,
+        specimens,
+        ResourceType.Specimen.toString(),
+        r4DataResourceIds);
+
+    Set<Resource> medicationRequests =
+        kd.getResourcesByType(ResourceType.MedicationRequest.toString());
+    addResourcesToR4FhirData(
+        dataId,
+        data,
+        r4FhirData,
+        details,
+        medicationRequests,
+        ResourceType.MedicationRequest.toString(),
         r4DataResourceIds);
   }
 
@@ -233,12 +237,27 @@ public class R3ToR2DataConverterUtils {
         Resource location = resources.iterator().next();
         r4FhirData.setLocation((Location) location);
         data.addEntry(new BundleEntryComponent().setResource(location));
+
+        ArrayList<Location> locList = new ArrayList<>();
+        for (Resource r : resources) {
+          locList.add((Location) r);
+          data.addEntry(new BundleEntryComponent().setResource((Location) r));
+        }
+        r4FhirData.addLocations(locList);
+
       } else if (type.contentEquals(ResourceType.Organization.toString())) {
 
         logger.info(" Setting up the organization for R4FhirData ");
         Resource organization = resources.iterator().next();
         r4FhirData.setOrganization((Organization) organization);
-        data.addEntry(new BundleEntryComponent().setResource(organization));
+
+        ArrayList<Organization> orgList = new ArrayList<>();
+        for (Resource r : resources) {
+          orgList.add((Organization) r);
+          data.addEntry(new BundleEntryComponent().setResource((Organization) r));
+        }
+        r4FhirData.addOrganization(orgList);
+
       } else if (type.contentEquals(ResourceType.Practitioner.toString())) {
 
         logger.info(" Setting up the Practitioner for R4FhirData ");
@@ -272,12 +291,14 @@ public class R3ToR2DataConverterUtils {
                     .getCodingFirstRep()
                     .getCode()
                     .contentEquals("encounter-diagnosis")) {
+              logger.info(" Adding Encounter Diagnosis ");
               encDiagList.add(c);
             }
 
             data.addEntry(new BundleEntryComponent().setResource(r));
 
             if (c.hasCode() && isPregnancyCondition(c.getCode())) {
+              logger.info(" Adding Pregnancy Condition ");
               pregnancyConditions.add(c);
             }
           }
@@ -343,7 +364,7 @@ public class R3ToR2DataConverterUtils {
             medStatementList.add((MedicationStatement) r);
             data.addEntry(new BundleEntryComponent().setResource(r));
           }
-          r4FhirData.setMedications(medStatementList);
+          r4FhirData.setMedicationStatements(medStatementList);
         }
       } else if (type.contentEquals(ResourceType.Medication.toString())) {
 
@@ -392,7 +413,7 @@ public class R3ToR2DataConverterUtils {
         ArrayList<Observation> vitalObsList = new ArrayList<>();
         if (vitalObs != null && !vitalObs.isEmpty()) {
 
-          for (Resource r : labObs) {
+          for (Resource r : vitalObs) {
             vitalObsList.add((Observation) r);
             data.addEntry(new BundleEntryComponent().setResource(r));
           }
@@ -400,10 +421,10 @@ public class R3ToR2DataConverterUtils {
         }
 
         logger.info(" Setting up the SocialHistory for R4FhirData ");
-        Set<Resource> socObs =
-            ReportGenerationUtils.filterObservationsByCategory(
-                resources, ObservationCategory.SOCIALHISTORY.toCode());
+        Set<Resource> socObs = ReportGenerationUtils.filterSocialHistoryObservations(resources);
+
         ArrayList<Observation> socObsList = new ArrayList<>();
+
         if (socObs != null && !socObs.isEmpty()) {
 
           List<Observation> occObs = new ArrayList<>();
@@ -418,6 +439,7 @@ public class R3ToR2DataConverterUtils {
           List<Observation> vaccineCredObs = new ArrayList<>();
           List<Observation> residencyObs = new ArrayList<>();
           List<Observation> nationalityObs = new ArrayList<>();
+          List<Observation> pregnancyIntentionObs = new ArrayList<>();
 
           for (Resource r : socObs) {
             Observation sochisObs = (Observation) r;
@@ -495,6 +517,11 @@ public class R3ToR2DataConverterUtils {
               logger.info(" Found Nationality Observation ");
               nationalityObs.add(sochisObs);
             }
+
+            if (sochisObs.hasCode() && isPregnancyIntentionObservation(sochisObs.getCode())) {
+              logger.info(" Found Pregnancy Intention Observation ");
+              pregnancyIntentionObs.add(sochisObs);
+            }
           }
 
           r4FhirData.addOccupationObs(occObs);
@@ -509,8 +536,21 @@ public class R3ToR2DataConverterUtils {
           r4FhirData.addVaccineCredObs(vaccineCredObs);
           r4FhirData.addResidencyObs(residencyObs);
           r4FhirData.addNationalityObs(nationalityObs);
+          r4FhirData.addPregnancyIntentionObs(pregnancyIntentionObs);
         }
 
+      } else if (type.contentEquals(ResourceType.Specimen.toString())) {
+
+        logger.info(" Setting up the Specimen  for R4FhirData ");
+        ArrayList<Specimen> specimenList = new ArrayList<>();
+        if (!resources.isEmpty()) {
+
+          for (Resource r : resources) {
+            specimenList.add((Specimen) r);
+            data.addEntry(new BundleEntryComponent().setResource(r));
+          }
+          r4FhirData.setSpecimenList(specimenList);
+        }
       } else if (type.contentEquals(ResourceType.DiagnosticReport.toString())) {
 
         logger.info(" Setting up the Diagnostic Report for R4FhirData ");
@@ -531,6 +571,66 @@ public class R3ToR2DataConverterUtils {
       }
     } else {
       logger.warn(" Cannot add null resources for type {}", type);
+    }
+  }
+
+  public static void setLocationAndServiceProviderOrganization(
+      KarProcessingData kd, R4FhirData r4FhirData) {
+
+    // Get the encounter.
+    Encounter enc = kd.getContextEncounter();
+
+    if (enc != null) {
+
+      // Get the Service Provider organization
+      if (enc.hasServiceProvider()) {
+        Reference orgRef = enc.getServiceProvider();
+
+        Resource orgRes =
+            kd.getResourceById(orgRef.getReferenceElement().getIdPart(), ResourceType.Organization);
+
+        if (orgRes != null) {
+
+          logger.info(" Found the organization for id {}", orgRes.getId());
+          Organization org = (Organization) orgRes;
+
+          r4FhirData.setOrganization(org);
+        } else {
+          logger.error(
+              " Did not find the service provider in KarProcessingData {}", orgRef.getId());
+        }
+      } else {
+        logger.error(" Service Provider not set in Encounter ");
+      }
+
+      // Get the location
+      if (enc.hasLocation()) {
+
+        List<EncounterLocationComponent> locComps = enc.getLocation();
+
+        for (EncounterLocationComponent el : locComps) {
+
+          Reference locRef = el.getLocation();
+          Resource locRes =
+              kd.getResourceById(locRef.getReferenceElement().getIdPart(), ResourceType.Location);
+
+          if (locRes != null) {
+
+            logger.info(" Found the location for id {}", locRes.getId());
+            Location loc = (Location) locRes;
+
+            r4FhirData.setLocation(loc);
+            break;
+          } else {
+            logger.error(" Did not find the location in KarProcessingData {}", locRef.getId());
+          }
+        } // for
+      } else {
+        logger.error(" Location is not set in Encounter ");
+      }
+
+    } else {
+      logger.error(" Context Encounter is null ");
     }
   }
 
@@ -662,6 +762,26 @@ public class R3ToR2DataConverterUtils {
     return false;
   }
 
+  public static Boolean isPregnancyIntentionObservation(CodeableConcept cd) {
+
+    if (cd != null && cd.hasCoding()) {
+
+      List<Coding> cds = cd.getCoding();
+
+      for (Coding c : cds) {
+
+        if (c.hasCode()
+            && c.hasSystem()
+            && ((c.getCode().contentEquals(CdaGeneratorConstants.PREGNANCY_INTENTION_CODE)
+                && c.getSystem().contains("http://loinc.org")))) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   public static Boolean isLastMenstrualPeriodObservation(CodeableConcept cd) {
 
     if (cd != null && cd.hasCoding()) {
@@ -672,7 +792,7 @@ public class R3ToR2DataConverterUtils {
 
         if (c.hasCode()
             && c.hasSystem()
-            && ((c.getCode().contentEquals("8665-2")
+            && ((c.getCode().contentEquals(CdaGeneratorConstants.LMP_CODE)
                 && c.getSystem().contains("http://loinc.org")))) {
           return true;
         }
@@ -901,7 +1021,7 @@ public class R3ToR2DataConverterUtils {
   private static JobStatus getJobStatusForActionStatus(BsaActionStatusType status) {
 
     if (status == BsaActionStatusType.COMPLETED) return JobStatus.COMPLETED;
-    else if (status == BsaActionStatusType.ABORTED) return JobStatus.ABORTED;
+    else if (status == BsaActionStatusType.SUSPENDED) return JobStatus.SUSPENDED;
     else if (status == BsaActionStatusType.FAILED) return JobStatus.ABORTED;
     else if (status == BsaActionStatusType.IN_PROGRESS) return JobStatus.IN_PROGRESS;
     else if (status == BsaActionStatusType.NOT_STARTED) return JobStatus.NOT_STARTED;

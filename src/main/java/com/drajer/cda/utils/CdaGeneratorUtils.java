@@ -127,7 +127,7 @@ public class CdaGeneratorUtils {
         + "\n";
   }
 
-  public static String getXmlHeaderForClinicalDocument() {
+  public static String getXmlHeaderForClinicalDocument(String version) {
     String xmlHeader =
         CdaGeneratorConstants.DOC_HEADER_XML + CdaGeneratorConstants.CLINICAL_DOC_HEADER_XML;
 
@@ -152,10 +152,18 @@ public class CdaGeneratorUtils {
     xmlHeader +=
         getXmlForTemplateId(
             CdaGeneratorConstants.CCDA_CCD_TEMPLATE_ID1, CdaGeneratorConstants.US_REALM_HEADER_EXT);
-    xmlHeader +=
-        getXmlForTemplateId(
-            CdaGeneratorConstants.PUBLIC_HEALTH_TEMPLATE_ID,
-            CdaGeneratorConstants.PUBLIC_HEALTH_EXT);
+
+    if (version.contentEquals(CdaGeneratorConstants.CDA_EICR_VERSION_R11)) {
+      xmlHeader +=
+          getXmlForTemplateId(
+              CdaGeneratorConstants.PUBLIC_HEALTH_TEMPLATE_ID,
+              CdaGeneratorConstants.PUBLIC_HEALTH_EXT);
+    } else {
+      xmlHeader +=
+          getXmlForTemplateId(
+              CdaGeneratorConstants.PUBLIC_HEALTH_TEMPLATE_ID,
+              CdaGeneratorConstants.PUBLIC_HEALTH_EXT_R31);
+    }
 
     return xmlHeader;
   }
@@ -592,6 +600,22 @@ public class CdaGeneratorUtils {
         + CdaGeneratorConstants.DOUBLE_QUOTE
         + CdaGeneratorConstants.SPACE
         + CdaGeneratorConstants.VALUE_WITH_EQUAL
+        + CdaGeneratorConstants.DOUBLE_QUOTE
+        + value
+        + CdaGeneratorConstants.DOUBLE_QUOTE
+        + CdaGeneratorConstants.END_XMLTAG_NEWLN;
+  }
+
+  public static String getXmlForNullValueEffectiveTime(String elName, String value) {
+    return CdaGeneratorConstants.START_XMLTAG
+        + elName
+        + CdaGeneratorConstants.SPACE
+        + CdaGeneratorConstants.XSI_TYPE
+        + CdaGeneratorConstants.DOUBLE_QUOTE
+        + CdaGeneratorConstants.TS_TYPE
+        + CdaGeneratorConstants.DOUBLE_QUOTE
+        + CdaGeneratorConstants.SPACE
+        + CdaGeneratorConstants.NULLFLAVOR_WITH_EQUAL
         + CdaGeneratorConstants.DOUBLE_QUOTE
         + value
         + CdaGeneratorConstants.DOUBLE_QUOTE
@@ -1095,6 +1119,42 @@ public class CdaGeneratorUtils {
     return retVal;
   }
 
+  public static String getXmlForValueIVLWithTS(
+      String elName, Pair<Date, TimeZone> low, Pair<Date, TimeZone> high) {
+
+    String retVal =
+        CdaGeneratorConstants.START_XMLTAG
+            + elName
+            + CdaGeneratorConstants.SPACE
+            + CdaGeneratorConstants.XSI_TYPE
+            + CdaGeneratorConstants.DOUBLE_QUOTE
+            + CdaGeneratorConstants.IVL_TS_TYPE
+            + CdaGeneratorConstants.DOUBLE_QUOTE
+            + CdaGeneratorConstants.RIGHT_ANGLE_BRACKET;
+
+    if (low != null)
+      retVal +=
+          CdaGeneratorUtils.getXmlForEffectiveTime(
+              CdaGeneratorConstants.TIME_LOW_EL_NAME, low.getValue0(), low.getValue1());
+    else
+      retVal +=
+          CdaGeneratorUtils.getXmlForNullEffectiveTime(
+              CdaGeneratorConstants.TIME_LOW_EL_NAME, CdaGeneratorConstants.NF_NI);
+
+    if (high != null)
+      retVal +=
+          CdaGeneratorUtils.getXmlForEffectiveTime(
+              CdaGeneratorConstants.TIME_HIGH_EL_NAME, high.getValue0(), high.getValue1());
+    else
+      retVal +=
+          CdaGeneratorUtils.getXmlForNullEffectiveTime(
+              CdaGeneratorConstants.TIME_HIGH_EL_NAME, CdaGeneratorConstants.NF_NI);
+
+    retVal += CdaGeneratorUtils.getXmlForEndElement(elName);
+
+    return retVal;
+  }
+
   public static String getXmlForLowIVLWithTSWithNFHigh(String elName, String value) {
     String s = "";
 
@@ -1154,39 +1214,70 @@ public class CdaGeneratorUtils {
   public static String getXmlForPIVLWithTS(String elName, String frequencyInHours) {
 
     String s = "";
-    s +=
-        CdaGeneratorConstants.START_XMLTAG
-            + elName
-            + CdaGeneratorConstants.SPACE
-            + CdaGeneratorConstants.XSI_TYPE
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.PIVL_TS_TYPE
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.SPACE
-            + "institutionSpecified="
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.CCDA_TRUE
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.SPACE
-            + "operator="
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.PIVL_TS_OPERATOR_VAL
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.RIGHT_ANGLE_BRACKET
-            + "\n"
-            + CdaGeneratorConstants.START_XMLTAG
-            + "period value="
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + frequencyInHours
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.SPACE
-            + CdaGeneratorConstants.UNIT_WITH_EQUAL
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.HOURS_UNITS_NAME
-            + CdaGeneratorConstants.DOUBLE_QUOTE
-            + CdaGeneratorConstants.END_XMLTAG_NEWLN
-            + CdaGeneratorUtils.getXmlForEndElement(elName);
-
+    if (StringUtils.isNotBlank(frequencyInHours)) {
+      s +=
+          CdaGeneratorConstants.START_XMLTAG
+              + elName
+              + CdaGeneratorConstants.SPACE
+              + CdaGeneratorConstants.XSI_TYPE
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.PIVL_TS_TYPE
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.SPACE
+              + "institutionSpecified="
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.CCDA_TRUE
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.SPACE
+              + "operator="
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.PIVL_TS_OPERATOR_VAL
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.RIGHT_ANGLE_BRACKET
+              + "\n"
+              + CdaGeneratorConstants.START_XMLTAG
+              + "period value="
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + frequencyInHours
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.SPACE
+              + CdaGeneratorConstants.UNIT_WITH_EQUAL
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.HOURS_UNITS_NAME
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.END_XMLTAG_NEWLN
+              + CdaGeneratorUtils.getXmlForEndElement(elName);
+    } else {
+      s +=
+          CdaGeneratorConstants.START_XMLTAG
+              + elName
+              + CdaGeneratorConstants.SPACE
+              + CdaGeneratorConstants.XSI_TYPE
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.PIVL_TS_TYPE
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.SPACE
+              + "institutionSpecified="
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.CCDA_TRUE
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.SPACE
+              + "operator="
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.PIVL_TS_OPERATOR_VAL
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.RIGHT_ANGLE_BRACKET
+              + "\n"
+              + CdaGeneratorConstants.START_XMLTAG
+              + "period"
+              + CdaGeneratorConstants.SPACE
+              + CdaGeneratorConstants.NULLFLAVOR_WITH_EQUAL
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + StringEscapeUtils.escapeXml10(CdaGeneratorConstants.NF_NI)
+              + CdaGeneratorConstants.DOUBLE_QUOTE
+              + CdaGeneratorConstants.END_XMLTAG_NEWLN
+              + CdaGeneratorUtils.getXmlForEndElement(elName);
+    }
     return s;
   }
 
@@ -2300,6 +2391,30 @@ public class CdaGeneratorUtils {
     s += getXmlForText(CdaGeneratorConstants.ORIGINAL_TEXT_EL_NAME, text);
 
     s += getXmlForEndElement(CdaGeneratorConstants.VAL_EL_NAME);
+
+    return s;
+  }
+
+  public static String getXmlForNFCDWithTranslation(
+      String elName, String code, String codeSystem, String codeSystemName, String displayName) {
+    String s =
+        CdaGeneratorConstants.START_XMLTAG
+            + elName
+            + CdaGeneratorConstants.SPACE
+            + CdaGeneratorConstants.NULLFLAVOR_WITH_EQUAL
+            + CdaGeneratorConstants.DOUBLE_QUOTE
+            + CdaGeneratorConstants.NF_OTH
+            + CdaGeneratorConstants.DOUBLE_QUOTE
+            + CdaGeneratorConstants.RIGHT_ANGLE_BRACKET;
+
+    s +=
+        getXmlForCD(
+            CdaGeneratorConstants.TRANSLATION_EL_NAME,
+            code,
+            codeSystem,
+            codeSystemName,
+            displayName);
+    s += getXmlForEndElement(elName);
 
     return s;
   }

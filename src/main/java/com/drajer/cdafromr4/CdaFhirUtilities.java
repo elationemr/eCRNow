@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TimeZone;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Address;
 import org.hl7.fhir.r4.model.BooleanType;
 import org.hl7.fhir.r4.model.Bundle.BundleEntryComponent;
@@ -43,7 +44,6 @@ import org.hl7.fhir.r4.model.MedicationStatement;
 import org.hl7.fhir.r4.model.Observation;
 import org.hl7.fhir.r4.model.Observation.ObservationComponentComponent;
 import org.hl7.fhir.r4.model.Organization;
-import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Patient.ContactComponent;
 import org.hl7.fhir.r4.model.Patient.PatientCommunicationComponent;
 import org.hl7.fhir.r4.model.Period;
@@ -52,6 +52,7 @@ import org.hl7.fhir.r4.model.Quantity;
 import org.hl7.fhir.r4.model.Reference;
 import org.hl7.fhir.r4.model.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
+import org.hl7.fhir.r4.model.Specimen;
 import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.Timing;
 import org.hl7.fhir.r4.model.Type;
@@ -106,45 +107,44 @@ public class CdaFhirUtilities {
     return returnIds;
   }
 
-  public static Patient.ContactComponent getGuardianContact(List<ContactComponent> ccs) {
+  public static List<ContactComponent> getGuardianContacts(List<ContactComponent> ccs) {
+    List<ContactComponent> guardianContacts = new ArrayList<>();
 
     if (ccs != null && !ccs.isEmpty()) {
-
       for (ContactComponent cc : ccs) {
-
         if (cc.hasRelationship()) {
-
           for (CodeableConcept cd : cc.getRelationship()) {
-
+            // Check Text field first
             if (cd.getText() != null
                 && (cd.getText().equalsIgnoreCase(CdaGeneratorConstants.GUARDIAN_EL_NAME)
                     || cd.getText()
                         .equalsIgnoreCase(CdaGeneratorConstants.GUARDIAN_PERSON_EL_NAME))) {
+              guardianContacts.add(cc);
+            }
 
-              return cc;
-            } else {
-              List<Coding> cs = cd.getCoding();
+            // Check Codings
+            for (Coding coding : cd.getCoding()) {
+              if (coding.hasSystem()
+                  && coding.hasCode()
+                  && (coding
+                          .getSystem()
+                          .equals(CdaGeneratorConstants.FHIR_CONTACT_RELATIONSHIP_CODESYSTEM)
+                      || coding
+                          .getSystem()
+                          .equals(CdaGeneratorConstants.DSTU2_FHIR_CONTACT_RELATIONSHIP_CODESYSTEM)
+                      || coding
+                          .getSystem()
+                          .equals(CdaGeneratorConstants.FHIR_LOC_ROLE_CODE_TYPE_V3))) {
 
-              for (Coding c : cs) {
-
-                if (c.hasSystem()
-                    && (c.getSystem()
-                            .contentEquals(
-                                CdaGeneratorConstants.FHIR_CONTACT_RELATIONSHIP_CODESYSTEM)
-                        || c.getSystem()
-                            .contentEquals(
-                                CdaGeneratorConstants.DSTU2_FHIR_CONTACT_RELATIONSHIP_CODESYSTEM)
-                        || c.getSystem()
-                            .contentEquals(CdaGeneratorConstants.FHIR_LOC_ROLE_CODE_TYPE_V3))
-                    && c.hasCode()
-                    && (c.getCode().contentEquals(CdaGeneratorConstants.GUARDIAN_VALUE)
-                        || c.getCode().contentEquals(CdaGeneratorConstants.GUARDIAN_EL_NAME)
-                        || c.getCode().contentEquals(CdaGeneratorConstants.EMERGENCY_VALUE)
-                        || c.getCode().contentEquals(CdaGeneratorConstants.GUARDIAN_PERSON_EL_NAME)
-                        || c.getCode().contentEquals(CdaGeneratorConstants.FHIR_GUARDIAN_VALUE)
-                        || c.getCode()
-                            .contentEquals(CdaGeneratorConstants.FHIR_EMERGENCY_CONTACT_VALUE))) {
-                  return cc;
+                if (coding.getCode().equals(CdaGeneratorConstants.GUARDIAN_VALUE)
+                    || coding.getCode().equals(CdaGeneratorConstants.GUARDIAN_EL_NAME)
+                    || coding.getCode().equals(CdaGeneratorConstants.GUARDIAN_PERSON_EL_NAME)
+                    || coding.getCode().equals(CdaGeneratorConstants.FHIR_GUARDIAN_VALUE)
+                    || coding.getCode().equals(CdaGeneratorConstants.EMERGENCY_VALUE)
+                    || coding
+                        .getCode()
+                        .equals(CdaGeneratorConstants.FHIR_EMERGENCY_CONTACT_VALUE)) {
+                  guardianContacts.add(cc);
                 }
               }
             }
@@ -152,12 +152,15 @@ public class CdaFhirUtilities {
         }
       }
     }
-
-    return null;
+    return guardianContacts;
   }
 
   public static Identifier getIdentifierForSystem(List<Identifier> ids, String system) {
 
+    if (StringUtils.isBlank(system)) {
+      logger.debug("System is null : {}", system);
+      return null;
+    }
     if (ids != null && !ids.isEmpty()) {
 
       for (Identifier id : ids) {
@@ -317,6 +320,47 @@ public class CdaFhirUtilities {
     return null;
   }
 
+  public static CodeableConcept getCodeableConceptFromExtension(
+      List<Extension> exts, String extUrl) {
+
+    if (exts != null && !exts.isEmpty()) {
+
+      for (Extension ext : exts) {
+
+        if (ext.getUrl() != null && ext.getUrl().contentEquals(extUrl)) {
+
+          // if the top level extension has Coding then we will use it.
+          if (ext.getValue() instanceof CodeableConcept) {
+
+            logger.debug("Found Extension ");
+            return (CodeableConcept) ext.getValue();
+          }
+        }
+      }
+    }
+
+    logger.debug("Did not find the Extension for the Url {}", extUrl);
+    return null;
+  }
+
+  public static Extension getExtensionForUrl(List<Extension> exts, String extUrl) {
+
+    if (exts != null && !exts.isEmpty()) {
+
+      for (Extension ext : exts) {
+
+        if (ext.getUrl() != null && ext.getUrl().contentEquals(extUrl)) {
+
+          logger.debug("Found Extension ");
+          return ext;
+        }
+      }
+    }
+
+    logger.debug("Did not find the Extension for the Url {}", extUrl);
+    return null;
+  }
+
   public static CodeType getCodeExtension(List<Extension> exts, String extUrl) {
 
     if (exts != null && !exts.isEmpty()) {
@@ -416,12 +460,25 @@ public class CdaFhirUtilities {
   public static String getAddressXml(List<Address> addrs, Boolean includeMultiples) {
 
     StringBuilder addrString = new StringBuilder(200);
+    StringBuilder altAddr = new StringBuilder(200);
 
     if (addrs != null && !addrs.isEmpty()) {
 
       if (includeMultiples) {
+        Boolean found = false;
         for (Address addr : addrs) {
-          addrString.append(getAddressXml(addr));
+
+          if (addr.hasPeriod() && !addr.getPeriod().hasEnd()) {
+            found = true;
+            addrString.append(getAddressXml(addr));
+          } else {
+            altAddr.append(getAddressXml(addr));
+          }
+        }
+
+        // Add an address if it was not found to have an end
+        if (!found) {
+          addrString.append(altAddr);
         }
       } else {
 
@@ -797,6 +854,25 @@ public class CdaFhirUtilities {
 
     logger.debug("Did not find entry for ID {} Type : {}", id, type);
     return null;
+  }
+
+  public static Boolean isCodeableConceptPresentForCodeSystem(
+      CodeableConcept cc, String codeSystemUrl) {
+
+    Boolean foundCodeSystem = false;
+
+    if (cc != null && cc.hasCoding()) {
+
+      for (Coding c : cc.getCoding()) {
+
+        if (c.hasSystem() && c.getSystem().contentEquals(codeSystemUrl)) {
+
+          foundCodeSystem = true;
+          break;
+        }
+      }
+    }
+    return foundCodeSystem;
   }
 
   public static Boolean isCodingPresentForCodeSystem(List<Coding> codings, String codeSystemUrl) {
@@ -1303,6 +1379,24 @@ public class CdaFhirUtilities {
 
   public static String getCodeableConceptXmlForValue(
       CodeableConcept cd, String cdName, String contentRef) {
+    String sb = "";
+    if (cd != null && cd.hasCoding()) {
+      sb += getCodingXmlForValue(cd.getCoding(), cdName, contentRef);
+    } else if (cd != null && cd.hasText()) {
+      sb += CdaGeneratorUtils.getXmlForValueString(cd.getText());
+    } else {
+      sb += CdaGeneratorUtils.getXmlForNullValueCD(cdName, CdaGeneratorConstants.NF_NI);
+    }
+
+    return sb;
+  }
+
+  public static String getCodeableConceptXmlForValueWithValueSetAndVersion(
+      CodeableConcept cd,
+      String cdName,
+      String contentRef,
+      String valueset,
+      String valuesetversion) {
     String sb = "";
     if (cd != null && cd.hasCoding()) {
       sb += getCodingXmlForValue(cd.getCoding(), cdName, contentRef);
@@ -1838,7 +1932,7 @@ public class CdaFhirUtilities {
 
     val = (val.isEmpty()) ? CdaGeneratorConstants.UNKNOWN_VALUE : val;
 
-    return val;
+    return StringEscapeUtils.escapeXml11(val);
   }
 
   public static String getCombinationStringForCodeSystem(
@@ -2070,7 +2164,9 @@ public class CdaFhirUtilities {
 
         Reference med = (Reference) medStmtRef.getMedication();
 
-        if (med.getReference().startsWith(CdaGeneratorConstants.FHIR_CONTAINED_REFERENCE)) {
+        if (med != null
+            && med.hasReference()
+            && med.getReference().startsWith(CdaGeneratorConstants.FHIR_CONTAINED_REFERENCE)) {
           // Check contained.
           String refId = med.getReference().substring(1);
 
@@ -2088,7 +2184,10 @@ public class CdaFhirUtilities {
             String id = med.getReferenceElement().getIdPart();
             Medication medRes = null;
             for (Medication m : medList) {
-              if (m.getIdElement().getIdPart().contentEquals(id)) {
+              if (id != null
+                  && m.hasIdElement()
+                  && m.getIdElement().hasIdPart()
+                  && m.getIdElement().getIdPart().contentEquals(id)) {
 
                 logger.info(" Found the non-contained medication reference resource {}", id);
                 medRes = m;
@@ -2121,7 +2220,31 @@ public class CdaFhirUtilities {
     if (dt != null) {
 
       StringBuilder val = new StringBuilder();
-      if (dt instanceof Coding) {
+
+      if (dt instanceof Extension) {
+
+        Extension ext = (Extension) dt;
+        if (ext.hasValue()) {
+          val.append(getStringForType(ext.getValue()));
+        } else if (ext.hasExtension()) {
+          List<Extension> exts = ext.getExtension();
+
+          String retV = "";
+          Boolean first = true;
+          for (Extension ex : exts) {
+            if (ex.hasValue() && first) {
+              retV += ex.getUrl() + "-" + (getStringForType(ex.getValue()));
+              first = false;
+            } else if (ex.hasValue()) {
+              retV += "|" + ex.getUrl() + "-" + getStringForType(ex.getValue());
+            }
+          }
+          val.append(retV);
+        } else {
+          return CdaGeneratorConstants.UNKNOWN_VALUE;
+        }
+
+      } else if (dt instanceof Coding) {
         Coding cd = (Coding) dt;
 
         val.append(getStringForCoding(cd));
@@ -2221,7 +2344,7 @@ public class CdaFhirUtilities {
       }
 
       logger.debug("Printing the class name {} and value {}", dt.getClass(), val);
-      return val.toString();
+      return StringEscapeUtils.escapeXml11(val.toString());
     }
     return CdaGeneratorConstants.UNKNOWN_VALUE;
   }
@@ -2361,12 +2484,17 @@ public class CdaFhirUtilities {
 
         DateTimeType d = (DateTimeType) dt;
 
-        val += CdaGeneratorUtils.getXmlForEffectiveTime(elName, d.getValue(), d.getTimeZone());
+        Pair<Date, TimeZone> low = new Pair<>(d.getValue(), d.getTimeZone());
+        val += CdaGeneratorUtils.getXmlForValueIVLWithTS(elName, low, null);
 
       } else if (dt instanceof Period) {
         Period pt = (Period) dt;
 
-        val += getPeriodXml(pt, elName, false);
+        Pair<Date, TimeZone> low = null;
+        Pair<Date, TimeZone> high = null;
+        if (pt.hasStart()) low = new Pair<>(pt.getStart(), pt.getStartElement().getTimeZone());
+        if (pt.hasEnd()) high = new Pair<>(pt.getEnd(), pt.getEndElement().getTimeZone());
+        val += CdaGeneratorUtils.getXmlForValueIVLWithTS(elName, low, high);
       } else if (dt instanceof Timing) {
 
         Timing t = (Timing) (dt);
@@ -2376,8 +2504,13 @@ public class CdaFhirUtilities {
         }
       }
 
-      logger.debug(PRINTING_THE_CLASS_NAME, dt.getClass());
       return val;
+    } else {
+      Pair<Date, TimeZone> low = null;
+      Pair<Date, TimeZone> high = null;
+      val +=
+          CdaGeneratorUtils.getXmlForValueIVLWithTS(
+              CdaGeneratorConstants.EFF_TIME_EL_NAME, low, high);
     }
 
     return val;
@@ -2397,7 +2530,8 @@ public class CdaFhirUtilities {
       logger.info("Found Medication of Type Reference within Domain Resource");
       Reference med = (Reference) dt;
       String codeXml = "";
-      if (med.getReference().startsWith(CdaGeneratorConstants.FHIR_CONTAINED_REFERENCE)) {
+      if (med.hasReference()
+          && med.getReference().startsWith(CdaGeneratorConstants.FHIR_CONTAINED_REFERENCE)) {
         // Check contained.
         String refId = med.getReference().substring(1);
 
@@ -2410,7 +2544,7 @@ public class CdaFhirUtilities {
 
           for (Resource r : meds) {
 
-            if (r.getId().contains(refId) && r instanceof Medication) {
+            if (r.hasId() && r.getId().contains(refId) && r instanceof Medication) {
 
               logger.info("Found Medication in contained resource");
 
@@ -2432,7 +2566,10 @@ public class CdaFhirUtilities {
           String id = med.getReferenceElement().getIdPart();
           Medication medRes = null;
           for (Medication m : medList) {
-            if (m.getIdElement().getIdPart().contentEquals(id)) {
+            if (id != null
+                && m.hasIdElement()
+                && m.getIdElement().hasIdPart()
+                && m.getIdElement().getIdPart().contentEquals(id)) {
 
               logger.info(" Found the non-contained medication reference resource {}", id);
               medRes = m;
@@ -2781,6 +2918,125 @@ public class CdaFhirUtilities {
     return retval.toString();
   }
 
+  public static String getXmlForMatchedCodesWithValueSetAndVersion(
+      String elementName,
+      Set<String> matchedCodes,
+      String valueSet,
+      String valuesetVersion,
+      CodeableConcept cc,
+      String contentRef,
+      Boolean valueElem) {
+
+    StringBuilder retval = new StringBuilder();
+    StringBuilder translations = new StringBuilder();
+
+    Boolean foundCodings = false;
+
+    if (cc != null && cc.hasCoding()) {
+
+      String dispName = cc.getText();
+
+      List<Coding> cds = cc.getCoding();
+
+      for (Coding cd : cds) {
+
+        if (cd.hasCode() && isCodeContained(matchedCodes, cd.getCode()) && !foundCodings) {
+
+          logger.debug(" Found a Coding that is in the trigger code matches. ");
+          if (cd.hasDisplay()) dispName = cd.getDisplay();
+
+          Pair<String, String> csd = CdaGeneratorConstants.getCodeSystemFromUrl(cd.getSystem());
+
+          if (Boolean.FALSE.equals(valueElem)
+              && csd != null
+              && !csd.getValue0().isEmpty()
+              && !csd.getValue1().isEmpty()) {
+            foundCodings = true;
+            retval.append(
+                CdaGeneratorUtils.getXmlForCDWithValueSetAndVersionWihoutEndTag(
+                    elementName,
+                    cd.getCode(),
+                    csd.getValue0(),
+                    csd.getValue1(),
+                    valueSet,
+                    valuesetVersion,
+                    dispName));
+
+            if (!contentRef.isEmpty())
+              retval.append(CdaGeneratorUtils.getXmlForOriginalTextWithReference(contentRef));
+
+          } else if (Boolean.TRUE.equals(valueElem)
+              && csd != null
+              && !csd.getValue0().isEmpty()
+              && !csd.getValue1().isEmpty()) {
+
+            foundCodings = true;
+            retval.append(
+                CdaGeneratorUtils.getXmlForValueCDWithValueSetAndVersionWihoutEndTag(
+                    elementName,
+                    cd.getCode(),
+                    csd.getValue0(),
+                    csd.getValue1(),
+                    valueSet,
+                    valuesetVersion,
+                    dispName));
+          }
+
+        } else {
+
+          Pair<String, String> csd = CdaGeneratorConstants.getCodeSystemFromUrl(cd.getSystem());
+
+          if (!csd.getValue0().isEmpty() && !csd.getValue1().isEmpty()) {
+
+            if (cd.hasDisplay()) dispName = cd.getDisplay();
+
+            // Create Translations.
+            translations.append(
+                CdaGeneratorUtils.getXmlForCD(
+                    CdaGeneratorConstants.TRANSLATION_EL_NAME,
+                    cd.getCode(),
+                    csd.getValue0(),
+                    csd.getValue1(),
+                    dispName));
+          }
+        } // create translation
+      } // for all codings
+    } // if codeable concept != null
+
+    if (Boolean.TRUE.equals(foundCodings)) {
+      retval.append(translations.toString());
+      retval.append(CdaGeneratorUtils.getXmlForEndElement(elementName));
+    } else {
+
+      String dispName = "";
+      if (cc != null && cc.getText() != null && !cc.getText().isEmpty()) dispName = cc.getText();
+
+      if (Boolean.FALSE.equals(valueElem)) {
+        retval.append(
+            CdaFhirUtilities.getCodeableConceptXml(
+                cc, CdaGeneratorConstants.CODE_EL_NAME, contentRef));
+      } else if (Boolean.TRUE.equals(valueElem)) {
+        retval.append(
+            CdaFhirUtilities.getCodeableConceptXmlForValue(
+                cc, CdaGeneratorConstants.CODE_EL_NAME, contentRef));
+      }
+    }
+
+    return retval.toString();
+  }
+
+  public static boolean isCodeContained(Set<String> codes, String code) {
+
+    if (codes != null && code != null) {
+
+      for (String s : codes) {
+        if (s.contains(code)) return true;
+      }
+    }
+
+    return false;
+  }
+
   public static String getStatusCodeForFhirMedStatusCodes(String val) {
 
     if (val.equalsIgnoreCase("active")
@@ -2835,6 +3091,45 @@ public class CdaFhirUtilities {
           && extension.getValue() instanceof Address) {
         logger.debug("Found Address Extension at top level.");
         return (Address) extension.getValue();
+      }
+    }
+    logger.debug("Did not find the Extension or sub extensions for the Url {}", extensionUrl);
+    return null;
+  }
+
+  public static Boolean getBooleanExtensionValue(List<Extension> extensions, String extensionUrl) {
+    if (extensions == null || extensions.isEmpty()) {
+      return false;
+    }
+
+    for (Extension extension : extensions) {
+      if (extension.hasUrl()
+          && extension.getUrl().equals(extensionUrl)
+          && extension.hasValue()
+          && extension.getValue() instanceof BooleanType) {
+        logger.debug("Found Address Extension at top level.");
+        BooleanType retVal = (BooleanType) extension.getValue();
+        return retVal.getValue();
+      }
+    }
+    logger.debug("Did not find the Extension or sub extensions for the Url {}", extensionUrl);
+    return false;
+  }
+
+  public static DateTimeType getDateTimeExtensionValue(
+      List<Extension> extensions, String extensionUrl) {
+
+    if (extensions == null || extensions.isEmpty()) {
+      return null;
+    }
+
+    for (Extension extension : extensions) {
+      if (extension.hasUrl()
+          && extension.getUrl().equals(extensionUrl)
+          && extension.hasValue()
+          && extension.getValue() instanceof DateTimeType) {
+        logger.debug("Found Address Extension at top level.");
+        return (DateTimeType) extension.getValue();
       }
     }
     logger.debug("Did not find the Extension or sub extensions for the Url {}", extensionUrl);
@@ -3009,7 +3304,7 @@ public class CdaFhirUtilities {
       }
     }
 
-    return result;
+    return StringEscapeUtils.escapeXml11(result);
   }
 
   public static String getRaceOrEthnicityXml(List<Extension> exts, String elName, String extUrl) {
@@ -3028,6 +3323,16 @@ public class CdaFhirUtilities {
                 CdaGeneratorConstants.RACE_CODE_SYSTEM,
                 CdaGeneratorConstants.RACE_CODE_SYSTEM_NAME,
                 re.getDisplay()));
+      } else if (doesCodingHaveOtherRace(re)) {
+
+        str.append(
+            CdaGeneratorUtils.getXmlForNFCDWithTranslation(
+                elName,
+                re.getCode(),
+                CdaGeneratorConstants.RACE_CODE_SYSTEM,
+                CdaGeneratorConstants.RACE_CODE_SYSTEM,
+                re.getDisplay()));
+
       } else {
         str.append(CdaGeneratorUtils.getXmlForNullCD(elName, re.getCode()));
       }
@@ -3054,6 +3359,13 @@ public class CdaFhirUtilities {
     if (coding != null
         && coding.hasCode()
         && (coding.getCode().contentEquals("ASKU") || coding.getCode().contentEquals("UNK"))) {
+      return true;
+    } else return false;
+  }
+
+  public static boolean doesCodingHaveOtherRace(Coding coding) {
+
+    if (coding != null && coding.hasCode() && (coding.getCode().contentEquals("2131-1"))) {
       return true;
     } else return false;
   }
@@ -3108,5 +3420,221 @@ public class CdaFhirUtilities {
       }
     }
     return sb.toString();
+  }
+
+  public static String getXmlForAuthorTime(DateTimeType dt) {
+
+    if (dt == null) {
+      return "";
+    }
+
+    return getXmlForAuthorTimeValues(dt.getValue(), dt.getTimeZone());
+  }
+
+  public static String getXmlForAuthorTimeValues(Date d, TimeZone t) {
+
+    StringBuilder sb = new StringBuilder();
+    sb.append(CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.AUTHOR_EL_NAME));
+    sb.append(CdaGeneratorUtils.getXmlForEffectiveTime(CdaGeneratorConstants.TIME_EL_NAME, d, t));
+    sb.append(
+        CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.ASSIGNED_AUTHOR_EL_NAME));
+    sb.append(CdaGeneratorUtils.getNFXMLForII(CdaGeneratorConstants.NF_NA));
+    sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.ASSIGNED_AUTHOR_EL_NAME));
+    sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.AUTHOR_EL_NAME));
+
+    return sb.toString();
+  }
+
+  public static String getXmlForAuthorTime(InstantType dt) {
+    if (dt == null) {
+      return "";
+    }
+
+    return getXmlForAuthorTimeValues(dt.getValue(), dt.getTimeZone());
+  }
+
+  public static String getDisplayStringForPeriod(Period pd) {
+    if (pd != null) {
+      if (pd.hasStart())
+        return CdaGeneratorUtils.getStringForDateTime(
+            pd.getStart(), pd.getStartElement().getTimeZone());
+      else if (pd.hasEnd())
+        return CdaGeneratorUtils.getStringForDateTime(
+            pd.getEnd(), pd.getEndElement().getTimeZone());
+      else return CdaGeneratorConstants.UNKNOWN_VALUE;
+    } else {
+      return CdaGeneratorConstants.UNKNOWN_VALUE;
+    }
+  }
+
+  public static String getDisplayStringForCodeableConcept(List<CodeableConcept> codes) {
+
+    if (codes != null) {
+
+      for (CodeableConcept cc : codes) {
+
+        String s = getDisplayStringForCodeableConcept(cc);
+
+        if (!s.contentEquals(CdaGeneratorConstants.UNKNOWN_VALUE)) return s;
+      }
+    }
+
+    // Nothing worked, so use unknown value.
+    return CdaGeneratorConstants.UNKNOWN_VALUE;
+  }
+
+  public static String getDisplayStringForCodeableConcept(CodeableConcept code) {
+
+    if (code != null) {
+      if (code.hasText() && !code.getText().isEmpty()) return code.getText();
+
+      if (code.hasCoding() && !code.getCoding().isEmpty()) {
+
+        for (Coding c : code.getCoding()) {
+
+          if (c.hasDisplay() && !c.getDisplay().isEmpty()) {
+            return c.getDisplay();
+          }
+        }
+
+        // No display names, so use the system + code or just code
+        if (code.getCodingFirstRep().hasSystem() && code.getCodingFirstRep().hasCode()) {
+          return code.getCodingFirstRep().getSystem() + "|" + code.getCodingFirstRep().getCode();
+        }
+      }
+    }
+
+    return CdaGeneratorConstants.UNKNOWN_VALUE;
+  }
+
+  public static String getDisplayStringForCoding(Coding code) {
+
+    if (code != null && code.hasDisplay() && !code.getDisplay().isEmpty()) {
+      return code.getDisplay();
+    } else if (code != null && code.hasSystem() && code.hasCode()) {
+      return code.getSystem() + "|" + code.getCode();
+    } else if (code != null && code.hasCode()) {
+      return code.getCode();
+    }
+    // Nothing worked, so use unknown value.
+    return CdaGeneratorConstants.UNKNOWN_VALUE;
+  }
+
+  public static Boolean isCodePresent(List<CodeableConcept> cds, String code, String codeSystem) {
+
+    Boolean retVal = false;
+    if (cds != null && !cds.isEmpty()) {
+
+      for (CodeableConcept cc : cds) {
+        if (cc.hasCoding() && !cc.getCoding().isEmpty()) {
+
+          List<Coding> codings = cc.getCoding();
+          for (Coding c : codings) {
+            if (c.getCode().contentEquals(code) && c.getSystem().contentEquals(codeSystem)) {
+              logger.info(" Found code {} and codesystem {}", code, codeSystem);
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return retVal;
+  }
+
+  public static Boolean isCodeableConceptPresentInValueSet(String valueset, CodeableConcept code) {
+
+    if (valueset == null || code == null) return false;
+
+    if (code.hasCoding()) {
+
+      List<Coding> cds = code.getCoding();
+
+      for (Coding cd : cds) {
+
+        if (cd.hasCode() && CdaGeneratorConstants.isCodePresentInValueSet(valueset, cd.getCode())) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  public static String getXmlForSpecimen(Specimen spec) {
+
+    StringBuilder sb = new StringBuilder();
+
+    if (spec != null && spec.hasType()) {
+      sb.append(
+          CdaGeneratorUtils.getXmlForStartElementWithTypeCode(
+              CdaGeneratorConstants.SPECIMEN_EL_NAME, CdaGeneratorConstants.TYPE_CODE_SPECIMEN));
+
+      sb.append(
+          CdaGeneratorUtils.getXmlForStartElementWithClassCode(
+              CdaGeneratorConstants.SPECIMEN_ROLE_EL_NAME,
+              CdaGeneratorConstants.SPECIMEN_ROLE_CLASS_CODE));
+      sb.append(CdaGeneratorUtils.getXmlForIIUsingGuid());
+      sb.append(
+          CdaGeneratorUtils.getXmlForStartElement(CdaGeneratorConstants.SPECIMEN_PLAYING_ENTITY));
+
+      List<CodeableConcept> cds = new ArrayList<>();
+      cds.add(spec.getType());
+      sb.append(
+          CdaFhirUtilities.getCodeableConceptXml(cds, CdaGeneratorConstants.CODE_EL_NAME, false));
+
+      sb.append(
+          CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.SPECIMEN_PLAYING_ENTITY));
+      sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.SPECIMEN_ROLE_EL_NAME));
+      sb.append(CdaGeneratorUtils.getXmlForEndElement(CdaGeneratorConstants.SPECIMEN_EL_NAME));
+    }
+
+    return sb.toString();
+  }
+
+  public static String getStringForSpecimenCollectionDate(
+      List<Reference> specimenRefs, R4FhirData data) {
+    if (data == null || specimenRefs == null || specimenRefs.isEmpty()) {
+      return CdaGeneratorConstants.UNKNOWN_VALUE;
+    }
+
+    for (Reference reference : specimenRefs) {
+      if (reference.hasReferenceElement()
+          && reference.getReferenceElement().hasResourceType()
+          && ResourceType.fromCode(reference.getReferenceElement().getResourceType())
+              == ResourceType.Specimen) {
+
+        Specimen specimen = data.getSpecimenById(reference.getReferenceElement().getIdPart());
+        if (specimen != null && specimen.hasCollection()) {
+
+          if (specimen.getCollection().hasCollectedDateTimeType()) {
+            return CdaFhirUtilities.getStringForType(
+                specimen.getCollection().getCollectedDateTimeType());
+
+          } else if (specimen.getCollection().hasCollectedPeriod()) {
+            return CdaFhirUtilities.getStringForType(specimen.getCollection().getCollectedPeriod());
+          }
+        }
+      }
+    }
+    return CdaGeneratorConstants.UNKNOWN_VALUE;
+  }
+
+  public static String getNarrative(String frequency, String period, String periodUnit) {
+    StringBuilder narrative = new StringBuilder();
+    appendValue(narrative, "frequency", frequency);
+    appendValue(narrative, "period", period);
+    appendValue(narrative, "periodUnit", periodUnit);
+
+    return narrative.toString();
+  }
+
+  private static void appendValue(StringBuilder narrative, String label, String value) {
+    if (StringUtils.isNotBlank(value)) {
+      if (narrative.length() > 0) {
+        narrative.append("|"); // Add separator if narrative already has content
+      }
+      narrative.append(label).append(": ").append(value);
+    }
   }
 }

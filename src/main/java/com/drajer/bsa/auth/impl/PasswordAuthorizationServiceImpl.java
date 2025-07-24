@@ -4,11 +4,12 @@ import com.drajer.bsa.auth.AuthorizationService;
 import com.drajer.bsa.model.FhirServerDetails;
 import com.drajer.sof.model.Response;
 import com.jayway.jsonpath.JsonPath;
-import jakarta.transaction.Transactional;
 import java.security.KeyStoreException;
 import java.util.Objects;
+import javax.transaction.Transactional;
 import net.minidev.json.JSONArray;
 import org.apache.commons.text.StringEscapeUtils;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,9 @@ public class PasswordAuthorizationServiceImpl implements AuthorizationService {
   @Value("${jwks.keystore.password}")
   String password;
 
-  /** @param fsd The processing context which contains information such as patient, encounter */
+  /**
+   * @param fsd The processing context which contains information such as patient, encounter
+   */
   @Override
   public JSONObject getAuthorizationToken(FhirServerDetails fsd) {
     String baseUrl = fsd.getFhirServerBaseURL();
