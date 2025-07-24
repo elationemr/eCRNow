@@ -120,9 +120,8 @@ public class DirectEicrSender extends EicrSender {
     Properties props = new Properties();
 
     props.put("mail.smtp.auth", "true");
-
-    props.setProperty("mail.smtp.ssl.trust", "*");
     props.setProperty("mail.smtp.ssl.enable", "true");
+    props.setProperty("mail.smtp.ssl.checkserveridentity", "true");
 
     Session session = Session.getInstance(props, null);
 
