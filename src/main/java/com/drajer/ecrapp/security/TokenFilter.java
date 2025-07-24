@@ -1,7 +1,6 @@
 package com.drajer.ecrapp.security;
 
 import java.io.IOException;
-import java.util.stream.Collectors;
 import java.util.Collections;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
