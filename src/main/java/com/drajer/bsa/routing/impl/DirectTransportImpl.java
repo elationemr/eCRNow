@@ -164,12 +164,8 @@ public class DirectTransportImpl implements DataTransportInterface {
 
     // Setup the property to authenticate.
     props.put("mail.smtp.auth", "true");
-
-    // Trust all certificates
-    props.setProperty("mail.smtp.ssl.trust", "*");
-
-    // Enable SSL Connections from the client.
     props.setProperty("mail.smtp.ssl.enable", "true");
+    props.setProperty("mail.smtp.ssl.checkserveridentity", "true");
 
     // Set TLS protocols
     if (!StringUtils.isEmpty(directTlsVersion)) {
@@ -295,9 +291,8 @@ public class DirectTransportImpl implements DataTransportInterface {
 
       // Properties for Javamail
       Properties props = new Properties();
-      props.put("mail.imap.auth", "true");
       props.put("mail.imap.ssl.enable", "true");
-      props.put("mail.imap.ssl.trust", "*");
+      props.put("mail.imap.ssl.checkserveridentity", "true");
       if (!StringUtils.isEmpty(directTlsVersion)) {
         props.put("mail.imap.ssl.protocols", directTlsVersion);
       }
