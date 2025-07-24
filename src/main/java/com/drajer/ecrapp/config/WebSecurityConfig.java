@@ -10,9 +10,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -20,7 +19,7 @@ import org.springframework.web.filter.CorsFilter;
 
 @EnableWebSecurity
 @Configuration
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+public class WebSecurityConfig {
 
   private final Logger logger = LoggerFactory.getLogger(WebSecurityConfig.class);
 
@@ -64,8 +63,8 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     return new CorsFilter(source);
   }
 
-  @Override
-  protected void configure(HttpSecurity http) throws Exception {
+  @Bean
+  protected SecurityFilterChain configure(HttpSecurity http) throws Exception {
     logger.info("*******************************************************************");
     logger.info("Security Configuration {}", tokenFilterClassName);
     logger.info("*******************************************************************");
@@ -76,25 +75,19 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
       Filter customFilter =
           (Filter) context.getAutowireCapableBeanFactory().autowire(classInstance, 1, true);
-      http.cors()
-          .and()
-          .csrf()
-          .ignoringAntMatchers("/api/auth/**") // Exempt public auth endpoints from CSRF
-          .and()
+
+      http.securityMatcher("/api/**")
+          .csrf(csrf -> csrf.enable())
           .addFilterAfter(customFilter, UsernamePasswordAuthenticationFilter.class)
-          .authorizeRequests()
-          .antMatchers("/api/auth/**")
-          .permitAll(); // Publicly accessible endpoints
+          .authorizeHttpRequests()
+          .anyRequest()
+          .authenticated();
+
     } else {
       logger.info("Token Filter class Name is empty");
-      http.cors()
-          .and()
-          .csrf()
-          .ignoringAntMatchers("/api/auth/**") // Exempt auth endpoints
-          .and()
-          .authorizeRequests()
-          .anyRequest()
-          .permitAll();
+      http.csrf(csrf -> csrf.enable()).authorizeRequests().anyRequest().permitAll();
     }
+
+    return http.build();
   }
 }

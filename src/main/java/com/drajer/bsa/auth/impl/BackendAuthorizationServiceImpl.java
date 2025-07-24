@@ -6,6 +6,7 @@ import com.drajer.sof.model.Response;
 import com.jayway.jsonpath.JsonPath;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import jakarta.transaction.Transactional;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;

@@ -109,12 +109,12 @@
             <version>16.0.0</version>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/javax.interceptor/javax.interceptor-api -->
-        <dependency>
-            <groupId>javax.interceptor</groupId>
-            <artifactId>javax.interceptor-api</artifactId>
-            <version>1.2-b06</version>
-        </dependency>
+		<!-- https://mvnrepository.com/artifact/javax.interceptor/javax.interceptor-api -->
+		<dependency>
+			<groupId>javax.interceptor</groupId>
+			<artifactId>javax.interceptor-api</artifactId>
+			<version>1.2-b06</version>
+		</dependency>
 
 
         <dependency>
@@ -282,18 +282,18 @@
             <version>5.6.0</version>
         </dependency>
 
-        <!-- Direct Dependencies -->
-        <dependency>
-            <groupId>javax.mail</groupId>
-            <artifactId>javax.mail-api</artifactId>
-            <version>1.5.2</version>
-        </dependency>
+		<!-- Direct Dependencies -->
+		<dependency>
+			<groupId>jakarta.mail</groupId>
+			<artifactId>jakarta.mail-api</artifactId>
+			<version>1.6.7</version>
+		</dependency>
 
-        <dependency>
-            <groupId>com.sun.mail</groupId>
-            <artifactId>javax.mail</artifactId>
-            <version>1.5.2</version>
-        </dependency>
+		<dependency>
+			<groupId>com.sun.mail</groupId>
+			<artifactId>jakarta.mail</artifactId>
+			<version>1.6.7</version>
+		</dependency>
 
         <dependency>
             <groupId>com.sun.mail</groupId>

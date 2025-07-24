@@ -3,13 +3,10 @@ package com.drajer.bsa.dao.impl;
 import com.drajer.bsa.dao.NotificationContextDao;
 import com.drajer.bsa.model.NotificationContext;
 import com.drajer.ecrapp.dao.AbstractDao;
-import java.text.SimpleDateFormat;
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
+import java.util.List;
+import java.util.UUID;
 import org.hibernate.Criteria;
-import org.hibernate.criterion.*;
-import org.springframework.http.HttpStatus;
+import org.hibernate.criterion.Restrictions;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -32,7 +29,7 @@ public class NotificationContextDaoImpl extends AbstractDao implements Notificat
   /**
    * Method to create or update a NotificationContext.
    *
-   * @param hsd The HealthcareSettings details to be used for creation or updation.
+   * @param nc The NotificationContext to be used for creation or update.
    * @return Returns the NotificationContext created or updated.
    */
   @Override

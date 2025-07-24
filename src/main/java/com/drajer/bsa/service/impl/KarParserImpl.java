@@ -35,6 +35,7 @@ import com.drajer.bsa.utils.BsaServiceUtils;
 import com.drajer.bsa.utils.SubscriptionUtils;
 import com.drajer.cda.utils.CdaGeneratorConstants;
 import com.drajer.sof.utils.FhirContextInitializer;
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
@@ -47,7 +48,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import javax.annotation.PostConstruct;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.filefilter.FileFilterUtils;
 import org.hl7.fhir.exceptions.FHIRException;
@@ -161,13 +161,13 @@ public class KarParserImpl implements KarParser {
   @Autowired KnowledgeArtifactRepositorySystem knowledgeArtifactRepositorySystem;
 
   // Autowired to pass to action processors.
-  @Autowired R4MeasureProcessor measureProcessor;
+  R4MeasureProcessor measureProcessor;
 
   // Autowired to pass to CqlProcessors.
-  @Autowired ExpressionEvaluator expressionEvaluator;
+  ExpressionEvaluator expressionEvaluator;
 
   // Autowired to pass to FhirPathProcessors.
-  @Autowired LibraryProcessor libraryProcessor;
+  LibraryProcessor libraryProcessor;
 
   // Autowired to pass to Actions
   @Autowired PublicHealthMessagesDao phDao;

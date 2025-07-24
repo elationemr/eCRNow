@@ -2,13 +2,22 @@ package com.drajer.bsa.kar.model;
 
 import com.drajer.bsa.model.BsaTypes.OutputContentType;
 import com.drajer.bsa.model.HealthcareSetting;
+import jakarta.persistence.*;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
-import javax.persistence.*;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.ManyToOne;
+import javax.persistence.Table;
+import javax.persistence.Transient;
 import org.hibernate.annotations.DynamicUpdate;
-import org.hibernate.annotations.Type;
-import org.hibernate.annotations.TypeDef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +34,6 @@ import org.slf4j.LoggerFactory;
     name = "hs_kar_status",
     indexes = {@Index(name = "idx_hs_id", columnList = "hs_id")})
 @DynamicUpdate
-@TypeDef(name = "SetOfStringsUserType", typeClass = SetOfStringsUserType.class)
 public class KnowledgeArtifactStatus {
 
   @Transient private final Logger logger = LoggerFactory.getLogger(KnowledgeArtifactStatus.class);
@@ -70,7 +78,7 @@ public class KnowledgeArtifactStatus {
    * Knowledge Artifact should not be processed.
    */
   @Column(name = "is_activated", nullable = false)
-  @Type(type = "org.hibernate.type.NumericBooleanType")
+  @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
   Boolean isActive;
 
   /** The last time the Knowledge Artifact became active. */
@@ -87,7 +95,7 @@ public class KnowledgeArtifactStatus {
    * KnowledgeArtifact becomes inactive, the subscriptions should be removed.
    */
   @Column(name = "is_subscriptions_enabled", nullable = false)
-  @Type(type = "org.hibernate.type.NumericBooleanType")
+  @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
   Boolean subscriptionsEnabled;
 
   /**
@@ -95,11 +103,10 @@ public class KnowledgeArtifactStatus {
    * HealthcareSetting.
    */
   @Column(name = "subscriptions", columnDefinition = "TEXT")
-  @Type(type = "SetOfStringsUserType")
   Set<String> subscriptions;
 
   @Column(name = "is_only_covid", nullable = false)
-  @Type(type = "org.hibernate.type.NumericBooleanType")
+  @Convert(converter = org.hibernate.type.NumericBooleanConverter.class)
   Boolean covidOnly;
 
   /**
